@@ -170,7 +170,7 @@ void USBH_Dev_Hub_Handle_InterruptIn(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev
 						((USBH_Device_cb_TypeDef*)Hub_Data->children[pn]->cb)->DeviceSpeedDetected(pcore, Hub_Data->children[pn], Hub_Data->children[pn]->device_prop.speed);
 
 						Hub_Data->children[pn]->gState = HOST_DEV_DELAY;
-						USBH_Dev_Reset_Timer = 1;
+						USBH_Dev_Reset_Timer = HCD_GetCurrentFrame(pcore);
 						Hub_Data->children[pn]->device_prop.address = 0; // new attached devices to a hub is always address 0
 						Hub_Data->port_busy = pnp1;
 						// we are allowed to pass this on to the upper state machine now, it will seem like it was attached normally

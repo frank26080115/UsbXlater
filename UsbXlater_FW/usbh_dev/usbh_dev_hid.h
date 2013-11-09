@@ -2,6 +2,7 @@
 #define usbh_dev_hid_h
 
 #include <usbh_lib/usbh_core.h>
+#include <hidrpt.h>
 
 void USBH_Dev_HID_DeInitDev(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev);
 USBH_Status USBH_Dev_HID_Task(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev);
@@ -43,7 +44,6 @@ typedef struct HID_cb
 {
 	void  (*Init)   (USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev, uint8_t intf);
 	void  (*Decode) (USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev, uint8_t intf, uint8_t ep, uint8_t *data, uint8_t len);
-	uint16_t simpleId;
 } HID_cb_TypeDef;
 
 // there's no use for this struct in UsbXlater yet
@@ -86,6 +86,7 @@ typedef struct
 	uint16_t             poll;
 	__IO uint16_t        timer;
 	HID_cb_TypeDef       *cb;
+	HID_Rpt_Parsing_Params_t parserParams;
 }
 HID_Data_t;
 

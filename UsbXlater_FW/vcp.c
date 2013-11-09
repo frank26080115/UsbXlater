@@ -20,9 +20,10 @@ void vcp_tx(uint8_t c)
 	if (USBD_CDC_IsReady == 0) return;
 
 	volatile uint32_t timeout = 0x7FFFFFFF;
-	while (ringbuffer_isfull(&USBD_CDC_D2H_FIFO) && timeout--) __NOP();
+	while (ringbuffer_isfull(&USBD_CDC_D2H_FIFO) != 0 && timeout--) __NOP();
 	if (ringbuffer_isfull(&USBD_CDC_D2H_FIFO) == 0) {
 		ringbuffer_push(&USBD_CDC_D2H_FIFO, c);
+		led_1_tog();
 	}
 }
 

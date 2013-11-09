@@ -49,46 +49,15 @@ void HID_Init_Default_Handler(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev, uint8_
 void HID_Decode_Default_Handler(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev, uint8_t intf, uint8_t ep, uint8_t* data, uint8_t len)
 {
 	HID_Data_t* HID_Data = &(((HID_Data_t*)(pdev->Usr_Data))[intf]);
-	uint16_t simpleId = HID_Data->cb->simpleId;
-
-	if (simpleId == 0) return;
-
-	uint8_t typeId = simpleId & 0xFF;
-
-	if (typeId == 0) return;
-
-	simpleId >>= 8;
-	uint8_t repId = simpleId & 0xFF;
-
-	if (repId != 0 && repId != data[0]) return;
-
-	static int repCnt;
-
-	if (typeId == 1)
+	HID_Rpt_Parsing_Params_t* parser = &HID_Data->parserParams;
+	if (parser->mouse_exists > 0 && parser->mouse_intf == intf && (parser->mouse_report_id <= 0 || parser->mouse_report_id == data[0]))
 	{
-		if (repCnt > 20) {
-			led_2_tog();
-			repCnt = 0;
-		}
-		repCnt++;
+		if (parser->mouse_report_id > 0) { data = &data[1]; len--; }
 
-		if (repId == 0) {
-			kbm2c_handleMouseReport(data, len);
-		}
-		else {
-			kbm2c_handleMouseReport(&data[1], len - 1);
-		}
 	}
-	else if (typeId == 2)
+	if (parser->kb_exists > 0 && parser->kb_intf == intf && (parser->kb_report_id <= 0 || parser->kb_report_id == data[0]))
 	{
-		led_2_tog();
-
-		if (repId == 0) {
-			kbm2c_handleKeyReport(data[0], &(data[2]), 6);
-		}
-		else {
-			kbm2c_handleKeyReport(data[1], &data[3], 5);
-		}
+		if (parser->kb_report_id > 0) { data = &data[1]; len--; }
 	}
 }
 
@@ -232,6 +201,7 @@ void USBH_Dev_HID_EnumerationDone(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
 		HID_Data->cb->Init   = HID_Init_Default_Handler;
 		HID_Data->cb->Decode = HID_Decode_Default_Handler;
 		HID_Data->state      = HID_IDLE;
+		HID_Rpt_Parsing_Params_Reset(&HID_Data->parserParams);
 
 		uint8_t maxEP = ( (pdev->device_prop.Itf_Desc[i].bNumEndpoints <= USBH_MAX_NUM_ENDPOINTS) ?
 						pdev->device_prop.Itf_Desc[i].bNumEndpoints :
@@ -309,7 +279,6 @@ void USBH_Dev_HID_EnumerationDone(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
 			continue;
 		}
 
-		HID_Rpt_Parsing_Params_t parser;
 		status = USBH_Get_HID_ReportDescriptor(pcore , pdev, i, HID_Data->HID_Desc.wItemLength);
 		if (status == USBH_OK) {
 			dbg_printf(DBGMODE_DEBUG, "\r\nUSBH_Get_HID_ReportDescriptor OK: 0x%04X\r\n", status);
@@ -320,12 +289,9 @@ void USBH_Dev_HID_EnumerationDone(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
 			}
 			vcp_printf("\r\n");
 
-			//HID_Rpt_Desc_Parse(pcore->host.Rx_Buffer, HID_Data->HID_Desc.wItemLength, &parser, i);
-			//dbg_printf(DBGMODE_DEBUG, "\r\n HID_Rpt_Desc_Parse max RepID: %d\r\n", parser.max_repId);
-
-			uint16_t simpleId = HID_Rpt_Desc_Parse_Simple(pcore->host.Rx_Buffer, HID_Data->HID_Desc.wItemLength);
-			HID_Data->cb->simpleId = simpleId;
-			dbg_printf(DBGMODE_DEBUG, "\r\n HID_Rpt_Desc_Parse_Simple 0x%04X for intf %d\r\n", simpleId, i);
+			HID_Rpt_Desc_Parse(pcore->host.Rx_Buffer, HID_Data->HID_Desc.wItemLength, &HID_Data->parserParams, i);
+			//dbg_printf(DBGMODE_DEBUG, "\r\n HID_Rpt_Desc_Parse \r\n");
+			HID_Rep_Parsing_Params_Debug_Dump(&HID_Data->parserParams);
 		}
 		else {
 			dbg_printf(DBGMODE_ERR, "\r\nUSBH_Get_HID_ReportDescriptor failed status: 0x%04X\r\n", status);

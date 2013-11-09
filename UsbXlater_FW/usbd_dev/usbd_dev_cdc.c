@@ -182,8 +182,6 @@ static uint8_t  USBD_CDC_HWDeInit (void  *pdev, uint8_t cfgidx)
 	DCD_EP_Close(pdev, USBD_Dev_CDC_H2D_EP);
 	DCD_EP_Close(pdev, USBD_Dev_CDC_CMD_EP);
 
-	dbg_trace();
-
 	free(USBD_CDC_H2D_Buff); USBD_CDC_H2D_Buff = 0;
 	free(USBD_CDC_D2H_Buff); USBD_CDC_D2H_Buff = 0;
 	free(USBD_CDC_CMD_Buff); USBD_CDC_CMD_Buff = 0;
@@ -212,7 +210,7 @@ static uint8_t  USBD_CDC_Setup (void  *pdev, USB_SETUP_REQ *req)
 		/* CDC Class Requests -------------------------------*/
 		case USB_REQ_TYPE_CLASS :
 			/* Check if the request is a data setup packet */
-			if (req->wLength)
+			if (req->wLength > 0)
 			{
 				/* Check if the request is Device-to-Host */
 				if (req->bmRequest & 0x80)
@@ -240,14 +238,10 @@ static uint8_t  USBD_CDC_Setup (void  *pdev, USB_SETUP_REQ *req)
 			{
 				// nothing to do
 				//VCP_Ctrl(req->bRequest, NULL, 0);
+				USBD_CtlSendStatus(pdev);
 			}
 
 			return USBD_OK;
-
-		default:
-			USBD_CtlError (pdev, req);
-			dbg_printf(DBGMODE_ERR, "\r\n CDC Stall, unknown bmRequest 0x%02X, file " __FILE__ ":%d\r\n", req->bmRequest, __LINE__);
-			return USBD_FAIL;
 
 		/* Standard Requests -------------------------------*/
 	case USB_REQ_TYPE_STANDARD:
@@ -281,6 +275,11 @@ static uint8_t  USBD_CDC_Setup (void  *pdev, USB_SETUP_REQ *req)
 			}
 			break;
 		}
+
+		default:
+			USBD_CtlError (pdev, req);
+			dbg_printf(DBGMODE_ERR, "\r\n CDC Stall, unknown bmRequest 0x%02X, file " __FILE__ ":%d\r\n", req->bmRequest, __LINE__);
+			return USBD_FAIL;
 	}
 	return USBD_OK;
 }
@@ -308,22 +307,24 @@ static uint8_t  USBD_CDC_DataIn (void *pdev, uint8_t epnum)
 {
 	uint16_t i;
 
-	if (USBD_CDC_InFlight != 0)
+	if (USBD_CDC_InFlight != 0) {
+		USBD_CDC_InFlight = 0;
+	}
+
+	if (ringbuffer_isempty(&USBD_CDC_D2H_FIFO) == 0)
 	{
-		if (ringbuffer_isempty(&USBD_CDC_D2H_FIFO) != 0)
-		{
-			for (i = 0; i < CDC_DATA_IN_PACKET_SIZE && ringbuffer_isempty(&USBD_CDC_D2H_FIFO) == 0; i++) {
-				USBD_CDC_D2H_Buff[i] = ringbuffer_pop(&USBD_CDC_D2H_FIFO);
-			}
-			DCD_EP_Tx (pdev,
-						USBD_Dev_CDC_D2H_EP,
-						(uint8_t*)USBD_CDC_D2H_Buff,
-						i);
+		for (i = 0; i < CDC_DATA_IN_PACKET_SIZE && ringbuffer_isempty(&USBD_CDC_D2H_FIFO) == 0; i++) {
+			USBD_CDC_D2H_Buff[i] = ringbuffer_pop(&USBD_CDC_D2H_FIFO);
 		}
-		else
-		{
-			USBD_CDC_InFlight = 0;
-		}
+		DCD_EP_Tx (pdev,
+					USBD_Dev_CDC_D2H_EP,
+					(uint8_t*)USBD_CDC_D2H_Buff,
+					i);
+		USBD_CDC_InFlight = 1;
+	}
+
+	if (USBD_CDC_InFlight == 0) {
+		DCD_EP_Flush(pdev, epnum);
 	}
 
 	return USBD_OK;
@@ -344,7 +345,8 @@ static uint8_t  USBD_CDC_DataOut (void *pdev, uint8_t epnum)
 	USB_Rx_Cnt = ((USB_OTG_CORE_HANDLE*)pdev)->dev.out_ep[epnum].xfer_count;
 
 	for (uint16_t i = 0; i < USB_Rx_Cnt; i++) {
-		ringbuffer_push(&USBD_CDC_H2D_FIFO, ((USB_OTG_CORE_HANDLE*)pdev)->dev.out_ep[epnum].xfer_buff[i]);
+		uint8_t c = USBD_CDC_H2D_Buff[i];
+		ringbuffer_push(&USBD_CDC_H2D_FIFO, c);
 	}
 
 	/* Prepare Out endpoint to receive next packet */
@@ -363,17 +365,14 @@ static uint8_t  USBD_CDC_DataOut (void *pdev, uint8_t epnum)
  * @param  epnum: endpoint number
  * @retval status
  */
+static uint32_t CdcFrameCount;
 static uint8_t  USBD_CDC_SOF (void *pdev)
 {
-	static uint32_t FrameCount = 0;
-
-	if (FrameCount++ == CDC_IN_FRAME_INTERVAL)
+	if (CdcFrameCount >= CDC_IN_FRAME_INTERVAL)
 	{
-		FrameCount = 0;
-
 		if (USBD_CDC_InFlight == 0)
 		{
-			if (ringbuffer_isempty(&USBD_CDC_D2H_FIFO) != 0)
+			if (ringbuffer_isempty(&USBD_CDC_D2H_FIFO) == 0)
 			{
 				uint16_t i;
 				for (i = 0; i < CDC_DATA_IN_PACKET_SIZE && ringbuffer_isempty(&USBD_CDC_D2H_FIFO) == 0; i++) {
@@ -384,9 +383,19 @@ static uint8_t  USBD_CDC_SOF (void *pdev)
 							(uint8_t*)USBD_CDC_D2H_Buff,
 							i);
 				USBD_CDC_InFlight = 1;
+				CdcFrameCount = 0;
 			}
 		}
+		else if (CdcFrameCount > 100) // timeout on waiting
+		{
+			led_1_tog();
+			CdcFrameCount = 0;
+			USBD_CDC_InFlight = 0;
+			DCD_EP_Flush(pdev, USBD_Dev_CDC_D2H_EP);
+		}
 	}
+
+	CdcFrameCount++;
 
 	return USBD_OK;
 }

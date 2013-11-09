@@ -262,9 +262,9 @@ void USBH_Process(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 		if (HCD_IsDeviceConnected(pcore))
 		{
 			if (USBH_Dev_Reset_Timer == 0) {
-				USBH_Dev_Reset_Timer = 1;
+				USBH_Dev_Reset_Timer = HCD_GetCurrentFrame(pcore);
 			}
-			else if (USBH_Dev_Reset_Timer > 100) {
+			else if ((HCD_GetCurrentFrame(pcore) - USBH_Dev_Reset_Timer) > 100) {
 				pdev->gState = HOST_DEV_ATTACHED;
 				dbg_printf(DBGMODE_TRACE, "\r\n USBH new device attached HOST_DEV_ATTACHED \r\n");
 			}
@@ -280,7 +280,7 @@ void USBH_Process(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 		// once the reset is done, the hub should receive an interrupt-in packet indicating, which is where the new state HOST_DEV_DELAY is set
 		break;
 	case HOST_DEV_DELAY :
-		if (USBH_Dev_Reset_Timer > 100) {
+		if ((HCD_GetCurrentFrame(pcore) - USBH_Dev_Reset_Timer) > 100) {
 			pdev->gState = HOST_DEV_ATTACHED;
 		}
 		break;

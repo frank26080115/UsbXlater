@@ -391,6 +391,8 @@ void  DCD_DevConnect (USB_OTG_CORE_HANDLE *pcore)
   dctl.b.sftdiscon  = 0;
   USB_OTG_WRITE_REG32(&pcore->regs.DREGS->DCTL, dctl.d32);
   USB_OTG_BSP_mDelay(3);
+#else
+#error bad config, do not use USE_OTG_MODE
 #endif
 }
 
@@ -409,6 +411,8 @@ void  DCD_DevDisconnect (USB_OTG_CORE_HANDLE *pcore)
   dctl.b.sftdiscon  = 1;
   USB_OTG_WRITE_REG32(&pcore->regs.DREGS->DCTL, dctl.d32);
   USB_OTG_BSP_mDelay(3);
+#else
+#error bad config, do not use USE_OTG_MODE
 #endif
 }
 

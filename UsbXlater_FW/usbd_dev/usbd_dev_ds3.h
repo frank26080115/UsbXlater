@@ -57,4 +57,6 @@ void USBD_Dev_DS3_DeviceConnected(void);
 void USBD_Dev_DS3_DeviceDisconnected(void);
 
 extern USBD_Device_cb_TypeDef USBD_Dev_DS3_cb;
+extern char USBD_Host_Is_PS3;
+
 #endif

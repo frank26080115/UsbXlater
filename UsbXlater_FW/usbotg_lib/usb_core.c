@@ -2166,6 +2166,7 @@ void OTG_HS_IRQHandler(void)
 
 void OTG_HS_WKUP_IRQHandler(void)
 {
+	// this shouldn't occur ever
 	dbg_printf(DBGMODE_ERR, "\r\n OTG_HS_WKUP_IRQHandler, file " __FILE__ ":%d\r\n", __LINE__);
 }
 

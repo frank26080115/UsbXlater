@@ -35,6 +35,10 @@ USBPTH_HC_EP_t USBPTH_Listeners[USBPTH_MAX_LISTENERS];
 USBH_EpDesc_TypeDef** USBPTH_OutEP;
 uint8_t USBPTH_OutEPCnt;
 
+void USBD_PullUp_Idle();
+void USBD_PullUp_On();
+void USBD_PullUp_Off();
+
 void USBPT_Main(USBH_DEV* pdev)
 {
 	USBPT_Init(pdev);
@@ -48,18 +52,21 @@ void USBPT_Init(USBH_DEV* pdev)
 	USBPTH_OutEPCnt = 0;
 	USBPT_Is_Active = 1;
 	USBPT_Dev = pdev;
-	USBH_Init(&USB_OTG_Core_host, USB_OTG_FS_CORE_ID, &USBPT_Host_cb);
+	USBH_InitCore(&USB_OTG_Core_host, USB_OTG_FS_CORE_ID);
+	USBH_InitDev(&USB_OTG_Core_host, &USBPT_Dev, &USBPT_Dev);
 	USBD_Init(&USB_OTG_Core_dev, USB_OTG_HS_CORE_ID, &USBPT_Dev_cb);
 	DCD_DevDisconnect(&USB_OTG_Core_dev);
+	USBD_PullUp_Off();
 }
 
 void USBPT_Work()
 {
 	if (USBPT_Has_Dev == 0)
 	{
-		if (HCD_IsDeviceConnected(&USBPT_Host_cb) != 0)
+		if (HCD_IsDeviceConnected(&USBPT_Dev) != 0)
 		{
 			DCD_DevConnect(&USB_OTG_Core_dev);
+			USBD_PullUp_On();
 			USBPT_Has_Dev = 1;
 		}
 		else
@@ -69,7 +76,7 @@ void USBPT_Work()
 	}
 	else
 	{
-		if (HCD_IsDeviceConnected(&USBPT_Host_cb) == 0)
+		if (HCD_IsDeviceConnected(&USBPT_Dev) == 0)
 		{
 			USBD_DeInit(&USB_OTG_Core_dev);
 			DCD_DevDisconnect(&USB_OTG_Core_dev);

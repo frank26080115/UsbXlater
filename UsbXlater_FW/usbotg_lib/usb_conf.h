@@ -164,7 +164,7 @@
  #define TXH_NP_HS_FIFOSIZ                        256
  #define TXH_P_HS_FIFOSIZ                         256
 
-// #define USB_OTG_HS_SOF_OUTPUT_ENABLED
+ #define USB_OTG_HS_SOF_OUTPUT_ENABLED
  #define USB_OTG_EXTERNAL_VBUS_ENABLED
 // #define USB_OTG_INTERNAL_VBUS_ENABLED
 

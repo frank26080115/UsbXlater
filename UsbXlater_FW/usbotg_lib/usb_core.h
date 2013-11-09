@@ -377,6 +377,10 @@ void         USB_OTG_StopDevice(USB_OTG_CORE_HANDLE *pcore);
 void         USB_OTG_SetEPStatus (USB_OTG_CORE_HANDLE *pcore , USB_OTG_EP *ep , uint32_t Status);
 uint32_t     USB_OTG_GetEPStatus(USB_OTG_CORE_HANDLE *pcore ,USB_OTG_EP *ep);
 #endif
+
+void OTG_HS_IRQHandler(void);
+void OTG_HS_WKUP_IRQHandler(void);
+void OTG_FS_IRQHandler(void);
 /**
   * @}
   */

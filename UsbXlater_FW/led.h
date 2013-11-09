@@ -222,7 +222,7 @@ static inline void led_100ms_event()
 {
 	for (int i = 0; i < 4; i++)
 	{
-		led_blink_pattern_t* pattern = &led_blink_pattern[i];
+		led_blink_pattern_t* pattern = (led_blink_pattern_t*)&led_blink_pattern[i];
 		if (pattern->on_time > 0 && pattern->on_time_remaining > 0)
 		{
 			pattern->on_time_remaining--;

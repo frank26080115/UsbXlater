@@ -50,6 +50,8 @@ static inline void delay_us(const uint32_t x)
 	while (1);
 }
 
+extern volatile uint32_t systick_1ms_cnt;
+
 extern volatile uint32_t delay_1ms_cnt;
 static inline void delay_ms(const uint32_t x)
 {

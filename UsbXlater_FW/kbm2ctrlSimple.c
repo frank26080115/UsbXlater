@@ -16,6 +16,7 @@
 
 #include "kbm2ctrl.h"
 #include "kbm2ctrl_keycodes.h"
+#include "hidrpt.h"
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
@@ -29,7 +30,7 @@ uint32_t kbm2c_keyFlags[KBM2C_KEYFLAGS_SIZE];
 uint32_t kbm2c_keyFlagsPrev[KBM2C_KEYFLAGS_SIZE];
 mouse_data_t kbm2c_mouseData;
 int16_t kbm2c_randomDeadZone[4] = { 0, 0, 0, 0, };
-volatile uint8_t kbm2c_mouseTimeSince;
+volatile uint32_t kbm2c_mouseTimestamp;
 
 int8_t kbm2c_stickLookUp[130] = { 0,1,2,11,16,20,23,25,28,30,32,34,36,38,39,41,43,44,45,47,48,50,51,52,53,54,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,74,75,76,77,78,79,80,80,81,82,83,83,84,85,86,87,87,88,89,89,90,91,92,92,93,94,94,95,96,96,97,98,98,99,100,100,101,102,102,103,103,104,105,105,106,107,107,108,108,109,110,110,111,111,112,112,113,114,114,115,115,116,116,117,118,118,119,119,120,120,121,121,122,122,123,123,124,124,125,125,126,126,127,128,128, };
 
@@ -38,6 +39,8 @@ int16_t kbm2c_testOffset = 0;
 
 void kbm2c_handleKeyReport(uint8_t modifier, uint8_t* data, uint8_t len)
 {
+	led_1_tog();
+
 	memset(kbm2c_keyFlags, 0, KBM2C_KEYFLAGS_SIZE * sizeof(uint32_t));
 	for (uint8_t i = 0; i < len; i++)
 	{
@@ -66,43 +69,80 @@ void kbm2c_handleKeyReport(uint8_t modifier, uint8_t* data, uint8_t len)
 	kbm2c_keyFlags[KBM2C_KEYFLAGS_SIZE - 1] |= modifier;
 }
 
-void kbm2c_handleMouseReport(uint8_t* data, uint8_t len)
+void kbm2c_handleMouseReport(uint8_t* data, uint8_t len, HID_Rpt_Parsing_Params_t* parser)
 {
-	kbm2c_mouseTimeSince = 12;
+	led_1_tog();
 
-	uint16_t xu = data[2];
-	xu += (data[3] & 0x0F) << 8;
-	if ((data[3] & 0x08) != 0) xu |= 0xF000;
+	kbm2c_mouseTimestamp = systick_1ms_cnt;
 
-	int16_t x = (int16_t)xu;
+	int32_t x32, y32;
 
-	uint16_t yu = data[4] << 8;
-	yu += data[3] & 0xF0;
-	int16_t y = (int16_t)yu;
-	y /= 16;
+	if (parser->mouse_xy_size == 8)
+	{
+		int8_t x8 = (int8_t)data[parser->mouse_xy_idx];
+		int8_t y8 = (int8_t)data[parser->mouse_xy_idx + 1];
+		x32 = x8;
+		y32 = y8;
+		if (x8 < 0 && x32 > 0) x32 *= -1;
+		if (y8 < 0 && y32 > 0) y32 *= -1;
+	}
+	else if (parser->mouse_xy_size == 12)
+	{
+		uint16_t xu16 = data[parser->mouse_xy_idx];
+		xu16 += (data[parser->mouse_xy_idx + 1] & 0x0F) << 8;
+		if ((data[parser->mouse_xy_idx + 1] & 0x08) != 0) xu16 |= 0xF000;
+
+		int16_t x16 = (int16_t)xu16;
+		x32 = x16;
+		if (x16 < 0 && x32 > 0) x32 *= -1;
+
+		uint16_t yu = data[parser->mouse_xy_idx + 2] << 8;
+		yu += data[parser->mouse_xy_idx + 1] & 0xF0;
+		int16_t y16 = (int16_t)yu;
+		y16 /= 16;
+		y32 = y16;
+		if (y16 < 0 && y32 > 0) y32 *= -1;
+	}
+	else if (parser->mouse_xy_size == 16)
+	{
+		int16_t x16 = *((int16_t*)(&data[parser->mouse_xy_idx]));
+		int16_t y16 = *((int16_t*)(&data[parser->mouse_xy_idx + 2]));
+		x32 = x16;
+		y32 = y16;
+		if (x16 < 0 && x32 > 0) x32 *= -1;
+		if (y16 < 0 && y32 > 0) y32 *= -1;
+	}
+	// TODO: add 20, 24, 28 bits?
+	else if (parser->mouse_xy_size == 32)
+	{
+		int32_t x_ = *((int32_t*)(&data[parser->mouse_xy_idx]));
+		int32_t y_ = *((int32_t*)(&data[parser->mouse_xy_idx + 4]));
+		x32 = x_;
+		y32 = y_;
+		if (x_ < 0 && x32 > 0) x32 *= -1;
+		if (y_ < 0 && y32 > 0) y32 *= -1;
+	}
 
 	int8_t w = 0;
-	w = (int8_t)data[5];
+	w = (int8_t)data[parser->mouse_wheel_idx];
+	if ((w > 0 && kbm2c_mouseData.w < 0) || (w < 0 && kbm2c_mouseData.w > 0)) kbm2c_mouseData.w = 0;
+	kbm2c_mouseData.w += w * 6;
+	// TODO: take wheel size into account?
 
-	double xd = x;
-	double yd = y;
+	// TODO: add side click/x wheel?
+	//int8_t wx = 0;
+	//wx = (int8_t)data[parser->mouse_wheelx_idx];
+	//if ((wx > 0 && kbm2c_mouseData.wx < 0) || (wx < 0 && kbm2c_mouseData.wx > 0)) kbm2c_mouseData.wx = 0;
+	//kbm2c_mouseData.wx += w * 6;
+
+	double xd = x32;
+	double yd = y32;
 
 	kbm2c_mouseData.x = (xd * KBM2C_MOUSE_FILTER) + (kbm2c_mouseData.x * (1.0d - KBM2C_MOUSE_FILTER));
 	kbm2c_mouseData.y = (yd * KBM2C_MOUSE_FILTER) + (kbm2c_mouseData.y * (1.0d - KBM2C_MOUSE_FILTER));
-	if ((w > 0 && kbm2c_mouseData.w < 0) || (w < 0 && kbm2c_mouseData.w > 0)) kbm2c_mouseData.w = 0;
-	kbm2c_mouseData.w += w * 6;
-	kbm2c_mouseData.btn = data[0];
-}
 
-void kbm2c_mouseDidNotMove()
-{
-	kbm2c_mouseData.x = (kbm2c_mouseData.x * (1.0d - KBM2C_MOUSE_FILTER));
-	kbm2c_mouseData.y = (kbm2c_mouseData.y * (1.0d - KBM2C_MOUSE_FILTER));
-	if (kbm2c_mouseData.x > KBM2C_MOUSE_DECAY) kbm2c_mouseData.x -= KBM2C_MOUSE_DECAY;
-	else if (kbm2c_mouseData.x < -KBM2C_MOUSE_DECAY) kbm2c_mouseData.x += KBM2C_MOUSE_DECAY;
-	if (kbm2c_mouseData.y > KBM2C_MOUSE_DECAY) kbm2c_mouseData.y -= KBM2C_MOUSE_DECAY;
-	else if (kbm2c_mouseData.y < -KBM2C_MOUSE_DECAY) kbm2c_mouseData.y += KBM2C_MOUSE_DECAY;
-	kbm2c_mouseTimeSince = 12;
+	kbm2c_mouseData.btn = data[parser->mouse_but_bitidx / 8];
+	// TODO: add more than 8 buttons?
 }
 
 void kbm2c_deadZoneCalc(ctrler_data_t* ctrler_data, double dz, int leftOrRight)
@@ -218,33 +258,23 @@ void kbm2c_report(USB_OTG_CORE_HANDLE *pcore)
 		ctrler_data.left_x += 127;
 	}
 
-	/*
-	double mx = kbm2c_mouseData.x;
-	double my = kbm2c_mouseData.y;
-
-	// our quadratic only works in the positive 1st quadrant
-	if (mx < 0) mx = -mx;
-	if (my < 0) my = -my;
-
-	// apply gain
-	mx *= 1.0d;
-	my *= 1.0d;
-
-	double mxx = mx * mx;
-	double myy = my * my;
-
-	mxx *= -0.0182643296032949d;
-	myy *= -0.0182643296032949d;
-	mx *= 2.9113136167709500d;
-	my *= 2.9113136167709500d;
-	mx += -9.6597085853966100d;
-	my += -9.6597085853966100d;
-
-	ctrler_data.right_x = mxx + mx;
-	if (kbm2c_mouseData.x < 0) ctrler_data.right_x = -ctrler_data.right_x;
-	ctrler_data.right_y = myy + my;
-	if (kbm2c_mouseData.y < 0) ctrler_data.right_y = -ctrler_data.right_y;
-	*/
+	uint32_t curT = systick_1ms_cnt;
+	if ((curT - kbm2c_mouseTimestamp) > 21)
+	{
+		kbm2c_mouseTimestamp = systick_1ms_cnt;
+		kbm2c_mouseData.x = 0;
+		kbm2c_mouseData.y = 0;
+	}
+	else if ((curT - kbm2c_mouseTimestamp) > 14)
+	{
+		kbm2c_mouseTimestamp = systick_1ms_cnt;
+		kbm2c_mouseData.x = (kbm2c_mouseData.x * (1.0d - KBM2C_MOUSE_FILTER));
+		kbm2c_mouseData.y = (kbm2c_mouseData.y * (1.0d - KBM2C_MOUSE_FILTER));
+		if (kbm2c_mouseData.x > KBM2C_MOUSE_DECAY) kbm2c_mouseData.x -= KBM2C_MOUSE_DECAY;
+		else if (kbm2c_mouseData.x < -KBM2C_MOUSE_DECAY) kbm2c_mouseData.x += KBM2C_MOUSE_DECAY;
+		if (kbm2c_mouseData.y > KBM2C_MOUSE_DECAY) kbm2c_mouseData.y -= KBM2C_MOUSE_DECAY;
+		else if (kbm2c_mouseData.y < -KBM2C_MOUSE_DECAY) kbm2c_mouseData.y += KBM2C_MOUSE_DECAY;
+	}
 
 	int i;
 	i = lround(kbm2c_mouseData.x);

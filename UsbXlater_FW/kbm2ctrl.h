@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <usbotg_lib/usb_core.h>
+#include "hidrpt.h"
 
 #define KBM2C_MAX_KEYACTIONS   32
 #define KBM2C_MAX_MOUSEACTIONS 16
@@ -183,10 +184,8 @@ typedef struct
 }
 ds3_packet_t;
 
-extern volatile uint8_t kbm2c_mouseTimeSince;
-
 void kbm2c_mouseDidNotMove();
-void kbm2c_handleMouseReport(uint8_t* data, uint8_t len);
+void kbm2c_handleMouseReport(uint8_t* data, uint8_t len, HID_Rpt_Parsing_Params_t* parser);
 void kbm2c_handleKeyReport(uint8_t modifier, uint8_t* data, uint8_t len);
 void kbm2c_report(USB_OTG_CORE_HANDLE *pcore);
 

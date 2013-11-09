@@ -201,6 +201,7 @@ static uint8_t USBD_SetupStage(USB_OTG_CORE_HANDLE *pdev)
 			break;
 
 		default:
+			//pdev->dev.cb->Setup (pdev, &req);
 			dbg_printf(DBGMODE_ERR, "\r\n USBD_SetupStage Stall, unknown bmRequest 0x%02X, file " __FILE__ ":%d\r\n", req.bmRequest, __LINE__);
 			DCD_EP_Stall(pdev , req.bmRequest & 0x80);
 			break;
