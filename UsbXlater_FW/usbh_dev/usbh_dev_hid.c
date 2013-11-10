@@ -53,11 +53,12 @@ void HID_Decode_Default_Handler(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev, uint
 	if (parser->mouse_exists > 0 && parser->mouse_intf == intf && (parser->mouse_report_id <= 0 || parser->mouse_report_id == data[0]))
 	{
 		if (parser->mouse_report_id > 0) { data = &data[1]; len--; }
-
+		kbm2c_handleMouseReport(data, len, parser);
 	}
 	if (parser->kb_exists > 0 && parser->kb_intf == intf && (parser->kb_report_id <= 0 || parser->kb_report_id == data[0]))
 	{
 		if (parser->kb_report_id > 0) { data = &data[1]; len--; }
+		kbm2c_handleKeyReport(data[0], &data[2], len - 2);
 	}
 }
 
