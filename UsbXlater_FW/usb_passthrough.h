@@ -26,7 +26,6 @@ USBPTH_HC_EP_t;
 
 #define USBPTH_MAX_LISTENERS 5
 
-void USBPT_Main(USBH_DEV* pdev);
 void USBPT_Init(USBH_DEV* pdev);
 void USBPT_Work();
 uint8_t USBPTD_SetupStage(USB_OTG_CORE_HANDLE* pcore, USB_SETUP_REQ* req);

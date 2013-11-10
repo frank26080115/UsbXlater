@@ -28,6 +28,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "usb_core.h"
 #include "usb_bsp.h"
+#include <usbd_lib/usb_dcd_int.h>
 
 
 /** @addtogroup USB_OTG_DRIVER
@@ -120,7 +121,7 @@ static void USB_OTG_EnableCommonInt(USB_OTG_CORE_HANDLE *pcore)
 * @param  pcore : Selected Peripheral Core
 * @retval USB_OTG_STS : status
 */
-static USB_OTG_STS USB_OTG_CoreReset(USB_OTG_CORE_HANDLE *pcore)
+USB_OTG_STS USB_OTG_CoreReset(USB_OTG_CORE_HANDLE *pcore)
 {
   USB_OTG_STS status = USB_OTG_OK;
   __IO USB_OTG_GRSTCTL_TypeDef  greset;
@@ -2154,6 +2155,10 @@ void USB_OTG_SetEPStatus (USB_OTG_CORE_HANDLE *pcore , USB_OTG_EP *ep , uint32_t
 
 #include <usbh_lib/usbh_core.h>
 #include <usbd_lib/usbd_core.h>
+#include <usbotg_lib/usb_core.h>
+#include <usbd_lib/usb_dcd_int.h>
+#include <usbh_lib/usb_hcd_int.h>
+#include <stm32f2/stm32fxxx_it.h>
 
 extern USB_OTG_CORE_HANDLE          USB_OTG_Core_dev;
 extern USB_OTG_CORE_HANDLE          USB_OTG_Core_host;

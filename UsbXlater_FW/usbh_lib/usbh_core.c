@@ -34,7 +34,8 @@
 #include "usbh_core.h"
 #include "usb_hcd_int.h"
 #include <usbh_dev/usbh_dev_inc_all.h>
-#include <usbh_dev/usbh_dev_manager.h> // TODO: write
+#include <usbh_dev/usbh_dev_manager.h>
+#include <vcp.h>
 
 
 /** @addtogroup USBH_LIB
@@ -180,10 +181,8 @@ void USBH_InitDev(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev, USBH_Device_cb_Typ
 {
 	/* Host de-initializations */
 	USBH_DeInit(pcore, pdev);
-
 	/*Register class and user callbacks */
 	pdev->cb = cb;
-
 	/* Upon Init call usr call back */
 	((USBH_Device_cb_TypeDef*)pdev->cb)->Init(pcore, pdev);
 }
@@ -211,8 +210,16 @@ USBH_Status USBH_DeInit(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
 	pdev->device_prop.address = USBH_DEVICE_ADDRESS_DEFAULT;
 	pdev->device_prop.speed = HPRT0_PRTSPD_FULL_SPEED;
 
+	if (pdev->Control.hc_num_in >= 0) {
+		USB_OTG_HC_Halt(pcore, pdev->Control.hc_num_in);
+	}
+	if (pdev->Control.hc_num_out >= 0) {
+		USB_OTG_HC_Halt(pcore, pdev->Control.hc_num_out);
+	}
 	USBH_Free_Channel(pcore, pdev->Control.hc_num_in);
 	USBH_Free_Channel(pcore, pdev->Control.hc_num_out);
+	pdev->Control.hc_num_in = -1;
+	pdev->Control.hc_num_out = -1;
 
 	return USBH_OK;
 }
@@ -305,30 +312,38 @@ void USBH_Process(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 
 			pdev->gState = HOST_ENUMERATION;
 
-			/* Open Control pipes */
-			USBH_Open_Channel(	pcore,
-								pdev->Control.hc_num_in,
-								pdev->device_prop.address, // still 0 at this point
-								pdev->device_prop.speed,
-								EP_TYPE_CTRL,
-								pdev->Control.ep0size);
+			// Open Control pipes
+			if (pdev->Control.hc_num_in >= 0 && pdev->Control.hc_num_out >= 0)
+			{
+				USBH_Open_Channel(	pcore,
+									pdev->Control.hc_num_in,
+									pdev->device_prop.address, // still 0 at this point
+									pdev->device_prop.speed,
+									EP_TYPE_CTRL,
+									pdev->Control.ep0size);
 
-			/* Open Control pipes */
-			USBH_Open_Channel(	pcore,
-								pdev->Control.hc_num_out,
-								pdev->device_prop.address, // still 0 at this point
-								pdev->device_prop.speed,
-								EP_TYPE_CTRL,
-								pdev->Control.ep0size);
+				USBH_Open_Channel(	pcore,
+									pdev->Control.hc_num_out,
+									pdev->device_prop.address, // still 0 at this point
+									pdev->device_prop.speed,
+									EP_TYPE_CTRL,
+									pdev->Control.ep0size);
+			}
+			else {
+				pdev->gState = HOST_DEV_ATTACHED; // retry
+				dbg_printf(DBGMODE_ERR, "\r\n Unable to open control EP \r\n");
+				break;
+			}
+
 		if (isDevRoot == 0)
 		{
 			pdev->gState = HOST_ENUMERATION_DELAY;
-			USBH_Dev_Reset_Timer = 1;
+			USBH_Dev_Reset_Timer = HCD_GetCurrentFrame(pcore);
 		}
 		break;
 
 	case HOST_ENUMERATION_DELAY:
-		if (USBH_Dev_Reset_Timer > 100) {
+		if ((HCD_GetCurrentFrame(pcore) - USBH_Dev_Reset_Timer) > 100) {
 			pdev->gState = HOST_ENUMERATION;
 		}
 	break;
@@ -366,7 +381,6 @@ void USBH_Process(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 		break;
 
 	case HOST_ERROR_STATE:
-		dbg_trace();
 		/* Re-Initilaize Host for new Enumeration */
 		((USBH_Device_cb_TypeDef*)pdev->cb)->DeInit(pcore, pdev);
 		((USBH_Device_cb_TypeDef*)pdev->cb)->DeInitDev(pcore, pdev);
@@ -374,7 +388,6 @@ void USBH_Process(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 		break;
 
 	case HOST_DEV_DISCONNECTED :
-	dbg_trace();
 
 	// only applies to root device, because memory needs to be freed for child devices
 
@@ -388,6 +401,7 @@ void USBH_Process(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 	if (isDevRoot) {
 		USBH_DeAllocate_AllChannel(pcore);
 		USBH_Dev_Reset_Timer = 0;
+		pdev->cb = &USBH_Dev_CB_Default;
 	}
 		pdev->gState = HOST_IDLE;
 
@@ -416,13 +430,11 @@ void USBH_ErrorHandle(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev, USBH_Status er
 	{
 		((USBH_Device_cb_TypeDef*)pdev->cb)->UnrecoveredError(pcore, pdev);
 		pdev->gState = HOST_ERROR_STATE;
-		dbg_trace();
 	}
 	/* USB host restart requested from application layer */
 	else if(errType == USBH_APPLY_DEINIT)
 	{
 		pdev->gState = HOST_ERROR_STATE;
-		dbg_trace();
 		/* user callback for initalization */
 		((USBH_Device_cb_TypeDef*)pdev->cb)->Init(pcore, pdev);
 	}
@@ -469,13 +481,13 @@ static USBH_Status USBH_HandleEnum(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
       }
       else {
         pdev->EnumState = ENUM_GET_FULL_DEV_DESC_WAIT;
-        USBH_Dev_Reset_Timer = 1;
+        USBH_Dev_Reset_Timer = HCD_GetCurrentFrame(pcore);
       }
     }
     break;
 
   case ENUM_GET_FULL_DEV_DESC_WAIT:
-    if (USBH_Dev_Reset_Timer > 100) {
+    if ((HCD_GetCurrentFrame(pcore) - USBH_Dev_Reset_Timer) > 100) {
       USBH_Modify_Channel (pcore,
                            pdev->Control.hc_num_out,
                            0,

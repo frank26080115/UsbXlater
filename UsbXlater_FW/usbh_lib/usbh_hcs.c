@@ -76,7 +76,7 @@
 /** @defgroup USBH_HCS_Private_FunctionPrototypes
   * @{
   */
-static uint16_t USBH_GetFreeChannel (USB_OTG_CORE_HANDLE *pcore);
+static int16_t USBH_GetFreeChannel (USB_OTG_CORE_HANDLE *pcore);
 /**
   * @}
   */
@@ -181,15 +181,15 @@ uint8_t USBH_Modify_Channel(USB_OTG_CORE_HANDLE *pcore,
   */
 uint8_t USBH_Alloc_Channel  (USB_OTG_CORE_HANDLE *pcore, uint8_t ep_addr)
 {
-  uint16_t hc_num;
+  int16_t hc_num;
 
   hc_num =  USBH_GetFreeChannel(pcore);
 
   //dbg_printf(DBGMODE_DEBUG, "\r\n USBH_Alloc_Channel HC allocated: %d\r\n", hc_num);
 
-  if (hc_num != HC_ERROR)
+  if (hc_num >= 0)
   {
-	pcore->host.channel[hc_num] = HC_USED | ep_addr;
+    pcore->host.channel[hc_num] = HC_USED | ep_addr;
   }
   return hc_num;
 }
@@ -202,11 +202,11 @@ uint8_t USBH_Alloc_Channel  (USB_OTG_CORE_HANDLE *pcore, uint8_t ep_addr)
   */
 uint8_t USBH_Free_Channel  (USB_OTG_CORE_HANDLE *pcore, uint8_t idx)
 {
-   if(idx < HC_MAX)
-   {
-	 pcore->host.channel[idx] &= HC_USED_MASK;
-   }
-   return USBH_OK;
+  if(idx < HC_MAX)
+  {
+    pcore->host.channel[idx] &= HC_USED_MASK;
+  }
+  return USBH_OK;
 }
 
 
@@ -220,7 +220,7 @@ uint8_t USBH_DeAllocate_AllChannel  (USB_OTG_CORE_HANDLE *pcore)
 {
    uint8_t idx;
 
-   for (idx = 2; idx < HC_MAX ; idx++)
+   for (idx = 0; idx < HC_MAX ; idx++)
    {
 	 pcore->host.channel[idx] = 0;
    }
@@ -233,7 +233,7 @@ uint8_t USBH_DeAllocate_AllChannel  (USB_OTG_CORE_HANDLE *pcore)
   * @param  None
   * @retval idx: Free Channel number
   */
-static uint16_t USBH_GetFreeChannel (USB_OTG_CORE_HANDLE *pcore)
+static int16_t USBH_GetFreeChannel (USB_OTG_CORE_HANDLE *pcore)
 {
   uint8_t idx = 0;
 

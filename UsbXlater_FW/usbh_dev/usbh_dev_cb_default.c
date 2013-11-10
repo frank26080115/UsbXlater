@@ -1,5 +1,6 @@
 #include "usbh_dev_cb_default.h"
 #include "usbh_dev_hub.h"
+#include <usbh_lib/usbh_hcs.h>
 
 USBH_Device_cb_TypeDef USBH_Dev_CB_Default = {
 	USBH_Dev_DefaultCB_DeInitDev,
@@ -42,17 +43,17 @@ USBH_Status USBH_Dev_DefaultCB_Task(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 		Hub_Data_t* hubData = (Hub_Data_t*)parentHub->Usr_Data;
 		hubData->port_busy = 0;
 		// this is a useless device, free the channel so another dev can use them
-		if (pdev->Control.hc_num_in != 0)
+		if (pdev->Control.hc_num_in >= 0)
 		{
 			USB_OTG_HC_Halt(pcore, pdev->Control.hc_num_in);
 			USBH_Free_Channel(pcore, pdev->Control.hc_num_in);
-			pdev->Control.hc_num_in = 0;
+			pdev->Control.hc_num_in = -1;
 		}
-		if (pdev->Control.hc_num_out != 0)
+		if (pdev->Control.hc_num_out >= 0)
 		{
 			USB_OTG_HC_Halt(pcore, pdev->Control.hc_num_out);
 			USBH_Free_Channel(pcore, pdev->Control.hc_num_out);
-			pdev->Control.hc_num_out = 0;
+			pdev->Control.hc_num_out = -1;
 		}
 	}
 

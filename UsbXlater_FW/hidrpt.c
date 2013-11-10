@@ -1,4 +1,5 @@
 #include "hidrpt.h"
+#include <vcp.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -168,8 +169,8 @@ void HID_Rep_Parsing_Params_Debug_Dump(HID_Rpt_Parsing_Params_t* x)
 	dbg_printf(DBGMODE_DEBUG, "\r\n Parsing_Params Dump: ");
 	vcp_printf("\r\n Parsing_Params Dump: ");
 	for (int i = 0; i < sizeof(HID_Rpt_Parsing_Params_t); i++) {
-		dbg_printf(DBGMODE_DEBUG, "%02X ", xp[i]);
-		vcp_printf("%02X ", xp[i]);
+		dbg_printf(DBGMODE_DEBUG, "0x%02X ", xp[i]);
+		vcp_printf("0x%02X ", xp[i]);
 	}
 	dbg_printf(DBGMODE_DEBUG, "\r\n");
 	vcp_printf("\r\n");

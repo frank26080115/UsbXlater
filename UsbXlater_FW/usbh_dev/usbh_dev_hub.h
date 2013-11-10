@@ -50,8 +50,8 @@ typedef struct
 {
 	Hub_State            state;
 	uint8_t              buff[64];
-	uint8_t              hc_num_in;
-	uint8_t              hc_num_out;
+	int8_t               hc_num_in;
+	int8_t               hc_num_out;
 	uint8_t              intOutEp;
 	uint8_t              intInEp;
 	uint16_t             length;

@@ -76,8 +76,8 @@ typedef struct
 	USBH_HIDDesc_TypeDef	HID_Desc;
 	char					start_toggle;
 	uint8_t              buff[64];
-	uint8_t              hc_num_in;
-	uint8_t              hc_num_out;
+	int8_t               hc_num_in;
+	int8_t               hc_num_out;
 	HID_State            state;
 	uint8_t              HIDIntOutEp;
 	uint8_t              HIDIntInEp;

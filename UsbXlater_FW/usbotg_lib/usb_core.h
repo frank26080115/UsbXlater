@@ -257,7 +257,7 @@ typedef struct _HCD
   __IO HC_STATUS           HC_Status[USB_OTG_MAX_TX_FIFOS];
   __IO URB_STATE           URB_State[USB_OTG_MAX_TX_FIFOS];
   USB_OTG_HC               hc [USB_OTG_MAX_TX_FIFOS];
-  uint16_t                 channel [USB_OTG_MAX_TX_FIFOS];
+  int16_t                  channel [USB_OTG_MAX_TX_FIFOS];
 //  USB_OTG_hPort_TypeDef    *port_cb;
 }
 HCD_DEV , *USB_OTG_USBH_PDEV;
@@ -378,6 +378,7 @@ void         USB_OTG_SetEPStatus (USB_OTG_CORE_HANDLE *pcore , USB_OTG_EP *ep , 
 uint32_t     USB_OTG_GetEPStatus(USB_OTG_CORE_HANDLE *pcore ,USB_OTG_EP *ep);
 #endif
 
+USB_OTG_STS USB_OTG_CoreReset(USB_OTG_CORE_HANDLE *pcore);
 void OTG_HS_IRQHandler(void);
 void OTG_HS_WKUP_IRQHandler(void);
 void OTG_FS_IRQHandler(void);

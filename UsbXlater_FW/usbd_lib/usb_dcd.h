@@ -110,6 +110,11 @@ void       DCD_Init(USB_OTG_CORE_HANDLE *pcore ,
 
 void        DCD_DevConnect (USB_OTG_CORE_HANDLE *pcore);
 void        DCD_DevDisconnect (USB_OTG_CORE_HANDLE *pcore);
+
+void USBD_ExPullUp_Idle();
+void USBD_ExPullUp_On();
+void USBD_ExPullUp_Off();
+
 void        DCD_EP_SetAddress (USB_OTG_CORE_HANDLE *pcore,
                                uint8_t address);
 uint32_t    DCD_EP_Open(USB_OTG_CORE_HANDLE *pcore , 

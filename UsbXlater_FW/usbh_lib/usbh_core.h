@@ -152,8 +152,8 @@ typedef enum {
 
 typedef struct _Ctrl
 {
-  uint8_t               hc_num_in;
-  uint8_t               hc_num_out;
+  int8_t                hc_num_in;
+  int8_t                hc_num_out;
   uint8_t               ep0size;
   uint8_t               *buff;
   uint16_t              length;
@@ -271,6 +271,7 @@ USBH_Status USBH_DeInit(USB_OTG_CORE_HANDLE *pcore,
 void USBH_Process(USB_OTG_CORE_HANDLE *pcore ,
                   USBH_DEV *pdev);
 void USBH_ErrorHandle(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev, USBH_Status errType);
+USBH_Status USBH_HandleControl (USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev);
 
 /**
   * @}

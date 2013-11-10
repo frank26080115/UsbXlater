@@ -3,8 +3,11 @@
 #include "vcp.h"
 #include "kbm2ctrl.h"
 #include "utilities.h"
+#include <stdlib.h>
+#include <string.h>
 #include <cmsis/swo.h>
 #include <cmsis/core_cmFunc.h>
+#include <cmsis/core_cm3.h>
 #include <stm32f2/system_stm32f2xx.h>
 #include <stm32f2/stm32f2xx.h>
 #include <stm32f2/misc.h>
@@ -14,6 +17,7 @@
 #include <usbotg_lib/usb_core.h>
 #include <usbotg_lib/usb_bsp.h>
 #include <usbh_lib/usbh_core.h>
+#include <usbh_lib/usbh_hcs.h>
 #include <usbd_lib/usbd_core.h>
 #include <usbh_dev/usbh_dev_manager.h>
 #include <usbh_dev/usbh_dev_inc_all.h>
@@ -26,9 +30,7 @@ static volatile char		send_ds3_report;
 volatile uint32_t			systick_1ms_cnt;
 volatile uint32_t			delay_1ms_cnt;
 
-void USBD_PullUp_Idle();
-void USBD_PullUp_On();
-void USBD_PullUp_Off();
+uint8_t cmdHandler();
 
 int main(void)
 {
@@ -71,7 +73,7 @@ int main(void)
 	led_3_on(); delay_ms(200); led_3_off();
 	led_4_on(); delay_ms(200); led_4_off();
 
-	USBD_PullUp_Idle();
+	USBD_ExPullUp_Idle();
 
 	USB_Hub_Hardware_Init();
 	USB_Hub_Hardware_Reset();
@@ -80,6 +82,7 @@ int main(void)
 
 	USBH_Dev_AddrManager_Reset();
 	USBH_InitCore(&USB_OTG_Core_host, USB_OTG_FS_CORE_ID);
+	USBH_DeAllocate_AllChannel(&USB_OTG_Core_host);
 	USBH_Dev.Parent = 0;
 	USBH_InitDev(&USB_OTG_Core_host, &USBH_Dev, &USBH_Dev_CB_Default);
 
@@ -134,7 +137,6 @@ int main(void)
 			dev_intf_state = DISTATE_VCP;
 
 			// force a disconnection
-			USBD_PullUp_Off();
 			DCD_DevDisconnect(&USB_OTG_Core_dev);
 
 			// setup new handler callbacks
@@ -149,46 +151,20 @@ int main(void)
 			}
 
 			// force a reconnection to reenumerate as CDC
-			USBD_PullUp_On();
 			DCD_DevConnect(&USB_OTG_Core_dev);
 
 			dbg_printf(DBGMODE_TRACE, "\r\n Entering VCP Mode \r\n");
 		}
 
-		/*
-		if (vcp_isReady())
-		{
-			int16_t c = vcp_rx();
-			if (c >= 0) {
-				vcp_tx(c);
-			}
+		uint8_t ret = cmdHandler();
+		if (ret == 1) {
+			run_passthrough();
 		}
-		//*/
-
-		if (host_intf_state == HISTATE_READY && dev_intf_state == DISTATE_NONE && systick_1ms_cnt > 5000)
-		{
-			host_intf_state = HISTATE_PASSTHROUGH;
-			dev_intf_state = DISTATE_PASSTHROUGH;
-
-			dbg_printf(DBGMODE_TRACE, "\r\n Entering Pass-Through Mode \r\n");
-
-			// force a disconnection
-			HCD_ResetPort(&USB_OTG_Core_host);
-			USBH_DeInit(&USB_OTG_Core_host, &USBH_Dev);
-			USBD_PullUp_Off();
-			DCD_DevDisconnect(&USB_OTG_Core_dev);
-			USBD_DeInit(&USB_OTG_Core_dev);
-
-			// small disconnection delay
-			delay_1ms_cnt = 200;
-			while (delay_1ms_cnt > 0) USBH_Process(&USB_OTG_Core_host, &USBH_Dev);
-
-			USBPT_Init(&USBH_Dev);
+		else if (ret == 2) {
+			run_bootload();
 		}
-
-		if (host_intf_state == HISTATE_PASSTHROUGH && dev_intf_state == DISTATE_PASSTHROUGH) {
-			USBPT_Work();
-			// there is no way to exit out of pass-through mode
+		else if (ret == 3) {
+			NVIC_SystemReset();
 		}
 
 		if (host_intf_state == HISTATE_NONE && dev_intf_state == DISTATE_NONE && systick_1ms_cnt > 5000)
@@ -196,13 +172,7 @@ int main(void)
 			// we'll assume the user wants to go into the raw bootloader if nothing is happening
 			// the device interface is the power source, so this is extremely rare in
 			// normal usage situations
-			dbg_printf(DBGMODE_TRACE, "\r\n Entering Bootloader Mode \r\n");
-
-			// small delay for trace message
-			delay_1ms_cnt = 200;
-			while (delay_1ms_cnt > 0) ;
-
-			jump_to_bootloader();
+			run_bootload();
 		}
 
 		if (send_ds3_report != 0)
@@ -255,9 +225,93 @@ void SysTick_Handler(void)
 	systick_1ms_cnt++;
 }
 
+void run_passthrough()
+{
+	dbg_printf(DBGMODE_TRACE, "\r\n Entering Pass-Through Mode \r\n");
+
+	// force a disconnection
+	HCD_ResetPort(&USB_OTG_Core_host);
+	USBH_DeInit(&USB_OTG_Core_host, &USBH_Dev);
+	USBH_DeAllocate_AllChannel(&USB_OTG_Core_host);
+	DCD_DevDisconnect(&USB_OTG_Core_dev);
+	USBD_DeInit(&USB_OTG_Core_dev);
+
+	// force full reset of both cores
+	USB_OTG_CoreReset(&USB_OTG_Core_host);
+	USB_OTG_CoreReset(&USB_OTG_Core_dev);
+
+	// small disconnection delay
+	delay_1ms_cnt = 200;
+	while (delay_1ms_cnt > 0) ;
+
+	USBPT_Init(&USBH_Dev);
+
+	while (1) USBPT_Work();
+}
+
+void run_bootload()
+{
+	dbg_printf(DBGMODE_TRACE, "\r\n Entering Bootloader Mode \r\n");
+
+	// small delay for trace message
+	delay_1ms_cnt = 200;
+	while (delay_1ms_cnt > 0) ;
+
+	jump_to_bootloader();
+}
+
+uint8_t cmdHandler()
+{
+	static char cmdBuff[32];
+	static int cmdBuffIdx = 0;
+
+	int16_t c = vcp_rx();
+	if (c < 0) {
+		c = cereal_rx();
+	}
+
+	if (c >= 0)
+	{
+		if (c == '\r' || c == '\n' || c == '\0')
+		{
+			if (strcmp(cmdBuff, "passthrough") == 0)
+			{
+				return 1;
+			}
+			else if (strcmp(cmdBuff, "bootload") == 0)
+			{
+				return 2;
+			}
+			else if (strcmp(cmdBuff, "reset") == 0)
+			{
+				return 3;
+			}
+			else
+			{
+				vcp_printf("\r\nunknown command: \"%s\"\r\n", cmdBuff);
+				cereal_printf("\r\nunknown command: \"%s\"\r\n", cmdBuff);
+			}
+
+			cmdBuffIdx = 0;
+			return 0;
+		}
+		else
+		{
+			if (cmdBuffIdx < 32)
+			{
+				cmdBuff[cmdBuffIdx] = c;
+				cmdBuffIdx++;
+				cmdBuff[cmdBuffIdx] = 0;
+			}
+		}
+	}
+
+	return 0;
+}
+
 // an external pull-up resistor is implemented because soft-disconnect doesn't work too well
 
-void USBD_PullUp_Idle()
+void USBD_ExPullUp_Idle()
 {
 	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOC, ENABLE);
 	GPIO_InitTypeDef gi;
@@ -268,7 +322,7 @@ void USBD_PullUp_Idle()
 	GPIO_Init(GPIOC, &gi);
 }
 
-void USBD_PullUp_On()
+void USBD_ExPullUp_On()
 {
 	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOC, ENABLE);
 	GPIO_InitTypeDef gi;
@@ -279,7 +333,7 @@ void USBD_PullUp_On()
 	GPIO_SetBits(GPIOC, GPIO_Pin_5);
 }
 
-void USBD_PullUp_Off()
+void USBD_ExPullUp_Off()
 {
 	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOC, ENABLE);
 	GPIO_InitTypeDef gi;

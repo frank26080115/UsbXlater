@@ -133,7 +133,7 @@ char USBD_CDC_IsReady = 0;
  * @param  cfgidx: Configuration index
  * @retval status
  */
-static uint8_t  USBD_CDC_HWInit (void* pdev, uint8_t cfgidx)
+static uint8_t  USBD_CDC_ClassInit (void* pdev, uint8_t cfgidx)
 {
 	DCD_EP_Open(pdev,
 				USBD_Dev_CDC_D2H_EP,
@@ -176,7 +176,7 @@ static uint8_t  USBD_CDC_HWInit (void* pdev, uint8_t cfgidx)
  * @param  cfgidx: Configuration index
  * @retval status
  */
-static uint8_t  USBD_CDC_HWDeInit (void  *pdev, uint8_t cfgidx)
+static uint8_t  USBD_CDC_ClassDeInit (void  *pdev, uint8_t cfgidx)
 {
 	DCD_EP_Close(pdev, USBD_Dev_CDC_D2H_EP);
 	DCD_EP_Close(pdev, USBD_Dev_CDC_H2D_EP);
@@ -448,7 +448,7 @@ uint8_t *  USBD_CDC_ConfigStrDescriptor( uint8_t speed , uint16_t *length)
 	return USBD_StrDesc;
 }
 
-uint8_t *  USBD_CDC_InterfaceStrDescriptor( uint8_t speed , uint16_t *length)
+uint8_t *  USBD_CDC_InterfaceStrDescriptor( uint8_t intf, uint8_t speed , uint16_t *length)
 {
 	USBD_GetString ("", USBD_StrDesc, length);
 	return USBD_StrDesc;
@@ -464,8 +464,8 @@ void USBD_CDC_DeviceDisconnected (void) { }
 
 USBD_Device_cb_TypeDef USBD_Dev_CDC_cb =
 {
-	USBD_CDC_HWInit,
-	USBD_CDC_HWDeInit,
+	USBD_CDC_ClassInit,
+	USBD_CDC_ClassDeInit,
 	USBD_CDC_Setup,
 	0,
 	USBD_CDC_EP0_RxReady,

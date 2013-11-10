@@ -70,7 +70,7 @@ void USBH_Dev_Hub_Handle_InterruptIn(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev
 
 	// we have previously deallocated the channel for the control EP
 	// we need to reallocate them
-	if (pdev->Control.hc_num_in == 0)
+	if (pdev->Control.hc_num_in < 0)
 	{
 		pdev->Control.hc_num_in  = USBH_Alloc_Channel(pcore, 0x80);
 		USBH_Open_Channel(	pcore,
@@ -80,7 +80,7 @@ void USBH_Dev_Hub_Handle_InterruptIn(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev
 							EP_TYPE_CTRL,
 							pdev->Control.ep0size);
 	}
-	if (pdev->Control.hc_num_out == 0)
+	if (pdev->Control.hc_num_out < 0)
 	{
 		pdev->Control.hc_num_out = USBH_Alloc_Channel(pcore, 0x00);
 		USBH_Open_Channel(	pcore,
@@ -114,7 +114,7 @@ void USBH_Dev_Hub_Handle_InterruptIn(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev
 				continue;
 			}
 
-			// dbg_printf(DBGMODE_DEBUG, "\r\n Hub_Handle_InterruptIn Hub_GetPortStatus, pn: %d, s: 0x%04X, c: 0x%04X\r\n", pnp1, wPortStatus, wPortChange);
+			dbg_printf(DBGMODE_DEBUG, "\r\n Hub_Handle_InterruptIn Hub_GetPortStatus, pn: %d, s: 0x%04X, c: 0x%04X\r\n", pnp1, wPortStatus, wPortChange);
 
 			if ((wPortStatus & (1 << HUBWPORTSTATUS_POWER_BIT)) == 0) {
 				errCode = USBH_Dev_Hub_SetPortFeature(pcore, pdev, pn, HUBREQ_PORT_POWER);
@@ -201,17 +201,17 @@ void USBH_Dev_Hub_Handle_InterruptIn(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev
 
 	// we don't need the control EP for a while
 	// free them so other devices can use them
-	if (pdev->Control.hc_num_in != 0)
+	if (pdev->Control.hc_num_in >= 0)
 	{
 		USB_OTG_HC_Halt(pcore, pdev->Control.hc_num_in);
 		USBH_Free_Channel(pcore, pdev->Control.hc_num_in);
-		pdev->Control.hc_num_in = 0;
+		pdev->Control.hc_num_in = -1;
 	}
-	if (pdev->Control.hc_num_out != 0)
+	if (pdev->Control.hc_num_out >= 0)
 	{
 		USB_OTG_HC_Halt(pcore, pdev->Control.hc_num_out);
 		USBH_Free_Channel(pcore, pdev->Control.hc_num_out);
-		pdev->Control.hc_num_out = 0;
+		pdev->Control.hc_num_out = -1;
 	}
 }
 
@@ -239,20 +239,20 @@ void USBH_Dev_Hub_DeInitDev(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 	Hub_Data->children = 0;
 
 	// these HCs are for the interrupt-in EPs
-	if (Hub_Data->hc_num_in != 0x00)
+	if (Hub_Data->hc_num_in >= 0)
 	{
 		USB_OTG_HC_Halt(pcore, Hub_Data->hc_num_in);
 		USBH_Free_Channel(pcore, Hub_Data->hc_num_in);
-		Hub_Data->hc_num_in = 0;
+		Hub_Data->hc_num_in = -1;
 	}
 
 	// this one shouldn't be allocated at all since there shouldn't be an interrupt-out EP
 	// but do it just in case (no performance hit here yet)
-	if(Hub_Data->hc_num_out != 0x00)
+	if(Hub_Data->hc_num_out >= 0)
 	{
 		USB_OTG_HC_Halt(pcore, Hub_Data->hc_num_out);
 		USBH_Free_Channel(pcore, Hub_Data->hc_num_out);
-		Hub_Data->hc_num_out = 0;     /* Reset the Channel as Free */
+		Hub_Data->hc_num_out = -1;
 	}
 
 	Hub_Data->start_toggle = 0;
@@ -297,9 +297,9 @@ USBH_Status USBH_Dev_Hub_Task(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
   case HubState_GET_DATA:
 
 	#ifdef HUB_ENABLE_DYNAMIC_HC_ALLOC
-	if (Hub_Data->hc_num_in == 0) {
+	if (Hub_Data->hc_num_in < 0) {
 		Hub_Data->hc_num_in = USBH_Alloc_Channel(pcore, Hub_Data->intInEp);
-		if (Hub_Data->hc_num_in > 0 && Hub_Data->hc_num_in != HC_ERROR) {
+		if (Hub_Data->hc_num_in >= 0) {
 			USBH_Open_Channel  (pcore,
 								Hub_Data->hc_num_in,
 								pdev->device_prop.address,
@@ -309,7 +309,7 @@ USBH_Status USBH_Dev_Hub_Task(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 		}
 	}
 
-	if (Hub_Data->hc_num_in > 0 && Hub_Data->hc_num_in != HC_ERROR) {
+	if (Hub_Data->hc_num_in >= 0) {
 	#endif
 	if(USB_OTG_IsEvenFrame(pcore) != FALSE) {
 		USBH_InterruptReceiveData(pcore,
@@ -357,10 +357,10 @@ USBH_Status USBH_Dev_Hub_Task(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 
     #ifdef HUB_ENABLE_DYNAMIC_HC_ALLOC
     if (toDeallocate != 0) {
-      if (Hub_Data->hc_num_in != 0) {
+      if (Hub_Data->hc_num_in >= 0) {
         USB_OTG_HC_Halt(pcore, Hub_Data->hc_num_in);
         USBH_Free_Channel(pcore, Hub_Data->hc_num_in);
-        Hub_Data->hc_num_in = 0;
+        Hub_Data->hc_num_in = -1;
       }
     }
     #endif
@@ -410,7 +410,6 @@ void USBH_Dev_Hub_DeviceDisconnected(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev
 	for (int pn = 0; pn < Hub_Data->num_ports; pn++)
 	{
 		if (Hub_Data->children[pn] != 0) {
-			dbg_trace();
 			// disconnect event for all children
 			((USBH_Device_cb_TypeDef*)Hub_Data->children[pn]->cb)->DeviceDisconnected(pcore, pdev);
 			USBH_DeInit(pcore, Hub_Data->children[pn]); // frees channels
@@ -453,7 +452,6 @@ void USBH_Dev_Hub_EnumerationDone(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 	dbg_printf(DBGMODE_TRACE, "\r\n Hub_EnumerationDone \r\n");
 
 	if (pdev->Usr_Data != 0) {
-		dbg_trace();
 		free(pdev->Usr_Data);
 		pdev->Usr_Data = 0;
 	}
@@ -518,7 +516,6 @@ void USBH_Dev_Hub_EnumerationDone(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 
 	// allocate memory for the children devices
 	if (Hub_Data->children != 0) {
-		dbg_trace();
 		free(Hub_Data->children);
 		Hub_Data->children = 0;
 	}

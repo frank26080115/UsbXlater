@@ -17,6 +17,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <cmsis/core_cm3.h>
+#include <cmsis/core_cmFunc.h>
 
 extern USB_OTG_CORE_HANDLE USB_OTG_Core_dev;
 extern USB_OTG_CORE_HANDLE USB_OTG_Core_host;
@@ -34,40 +36,67 @@ uint16_t USBPT_GeneralInDataLen;
 USBPTH_HC_EP_t USBPTH_Listeners[USBPTH_MAX_LISTENERS];
 USBH_EpDesc_TypeDef** USBPTH_OutEP;
 uint8_t USBPTH_OutEPCnt;
-
-void USBD_PullUp_Idle();
-void USBD_PullUp_On();
-void USBD_PullUp_Off();
-
-void USBPT_Main(USBH_DEV* pdev)
-{
-	USBPT_Init(pdev);
-	while (1) {
-		USBPT_Work();
-	}
-}
+static char USBPT_printf_buffer[256];
 
 void USBPT_Init(USBH_DEV* pdev)
 {
 	USBPTH_OutEPCnt = 0;
 	USBPT_Is_Active = 1;
 	USBPT_Dev = pdev;
+
+	for (uint8_t i = 0; i < USBPTH_MAX_LISTENERS; i++) {
+		USBPTH_Listeners[i].hc = 0;
+	}
+
+	// most of the device event handlers are spawned within ISRs
+	// so we must order the priorities such that the other
+	// ISRs can be serviced while still inside the device event handlers
+	NVIC_SetPriority(SysTick_IRQn, 0);
+	NVIC_SetPriority(USART1_IRQn, 1);
+	NVIC_SetPriority(OTG_FS_IRQn, 2);
+	NVIC_SetPriority(OTG_HS_IRQn, 7);
+
 	USBH_InitCore(&USB_OTG_Core_host, USB_OTG_FS_CORE_ID);
-	USBH_InitDev(&USB_OTG_Core_host, &USBPT_Dev, &USBPT_Dev);
+	USBH_InitDev(&USB_OTG_Core_host, USBPT_Dev, &USBPT_Host_cb);
+
 	USBD_Init(&USB_OTG_Core_dev, USB_OTG_HS_CORE_ID, &USBPT_Dev_cb);
 	DCD_DevDisconnect(&USB_OTG_Core_dev);
-	USBD_PullUp_Off();
+	USBPT_printf("\r\n USB Passthrough Mode \r\n");
+	delay_ms(2000);
 }
 
 void USBPT_Work()
 {
 	if (USBPT_Has_Dev == 0)
 	{
-		if (HCD_IsDeviceConnected(&USBPT_Dev) != 0)
+		if (HCD_IsDeviceConnected(&USB_OTG_Core_host) != 0)
 		{
-			DCD_DevConnect(&USB_OTG_Core_dev);
-			USBD_PullUp_On();
-			USBPT_Has_Dev = 1;
+			USBPT_printf("\r\n USBPT Device Connecting \r\n");
+
+			USBPT_Dev->Control.hc_num_out = USBH_Alloc_Channel(&USB_OTG_Core_host, 0x00);
+			USBPT_Dev->Control.hc_num_in  = USBH_Alloc_Channel(&USB_OTG_Core_host, 0x80);
+			if (USBPT_Dev->Control.hc_num_out >= 0 && USBPT_Dev->Control.hc_num_in >= 0)
+			{
+				USBH_Open_Channel(	&USB_OTG_Core_host,
+					USBPT_Dev->Control.hc_num_in,
+					USBPT_Dev->device_prop.address, // still 0 at this point
+					USBPT_Dev->device_prop.speed,
+					EP_TYPE_CTRL,
+					USBPT_Dev->Control.ep0size);
+				USBH_Open_Channel(	&USB_OTG_Core_host,
+					USBPT_Dev->Control.hc_num_out,
+					USBPT_Dev->device_prop.address, // still 0 at this point
+					USBPT_Dev->device_prop.speed,
+					EP_TYPE_CTRL,
+					USBPT_Dev->Control.ep0size);
+
+				DCD_DevConnect(&USB_OTG_Core_dev);
+				USBPT_Has_Dev = 1;
+			}
+			else
+			{
+				dbg_printf(DBGMODE_ERR, "\r\n USBPT Unable to allocate control EP HC \r\n");
+			}
 		}
 		else
 		{
@@ -76,19 +105,37 @@ void USBPT_Work()
 	}
 	else
 	{
-		if (HCD_IsDeviceConnected(&USBPT_Dev) == 0)
+		if (HCD_IsDeviceConnected(&USB_OTG_Core_host) == 0)
 		{
+			USBPT_printf("\r\n USBPT Device Disconnecting \r\n");
 			USBD_DeInit(&USB_OTG_Core_dev);
 			DCD_DevDisconnect(&USB_OTG_Core_dev);
 			USBPT_Has_Dev = 0;
+
+			for (uint8_t i = 0; i < USBPTH_MAX_LISTENERS; i++)
+			{
+				if (USBPTH_Listeners[i].hc != 0 && USBPTH_Listeners[i].hc != HC_ERROR)
+				{
+					USBH_Free_Channel(&USB_OTG_Core_host, USBPTH_Listeners[i].hc);
+					USBPTH_Listeners[i].hc = 0;
+				}
+			}
+
+			if (USBPT_Dev->Control.hc_num_out >= 0 && USBPT_Dev->Control.hc_num_in >= 0)
+			{
+				USBH_Free_Channel(&USB_OTG_Core_host, USBPT_Dev->Control.hc_num_out);
+				USBH_Free_Channel(&USB_OTG_Core_host, USBPT_Dev->Control.hc_num_in);
+				USBPT_Dev->Control.hc_num_in = -1;
+				USBPT_Dev->Control.hc_num_out = -1;
+			}
 		}
 	}
 
 	for (uint8_t i = 0; i < USBPTH_MAX_LISTENERS; i++)
 	{
 		USBPTH_HC_EP_t* pl = &USBPTH_Listeners[i];
-		uint8_t hc = pl->hc;
-		if (hc != 0) // if listener is actually allocated
+		uint8_t hc = USBPTH_Listeners[i].hc;
+		if (hc != 0 && hc != HC_ERROR) // if listener is actually allocated
 		{
 			USBH_EpDesc_TypeDef* epDesc = pl->epDesc;
 			uint8_t epnum = epDesc->bEndpointAddress;
@@ -96,8 +143,9 @@ void USBPT_Work()
 			USBPT_GeneralInDataLen = epDesc->wMaxPacketSize;
 
 			// try to send read tokens only on even frames
-			volatile uint32_t syncTries = 0x7FFFFFFF;
-			while (USB_OTG_IsEvenFrame(&USB_OTG_Core_host) == 0 && syncTries--) __NOP();
+			if (USB_OTG_IsEvenFrame(&USB_OTG_Core_host) == 0) continue;
+
+			dbg_trace();
 
 			// attempt to start the read, check the read type first
 			if ((epDesc->bmAttributes & USB_EP_TYPE_INTR) == USB_EP_TYPE_INTR) {
@@ -164,7 +212,7 @@ uint8_t USBPTD_SetupStage(USB_OTG_CORE_HANDLE* pcore, USB_SETUP_REQ* req)
 	memcpy(USBPT_LastSetupPacket, pcore->dev.setup_packet, 24);
 
 	// print for monitoring
-	USBPT_printf("\r\n USBPT:SETUP:");
+	USBPT_printf("\b\r\n USBPT:SETUP:");
 	for (uint8_t i = 0; i < 8; i++) {
 		USBPT_printf(" 0x%02X", USBPT_LastSetupPacket[i]);
 	}
@@ -177,7 +225,7 @@ uint8_t USBPTD_SetupStage(USB_OTG_CORE_HANDLE* pcore, USB_SETUP_REQ* req)
 	if ((req->bmRequest & 0x7F) == (USB_REQ_RECIPIENT_DEVICE | USB_REQ_TYPE_STANDARD) && req->bRequest == USB_REQ_SET_ADDRESS)
 	{
 		// let the internal code handle it for the device interface
-		USBD_StdDevReq(pcore, &req);
+		USBD_StdDevReq(pcore, req);
 
 		// pass it to the downstream device
 		USBH_CtlReq_Blocking(&USB_OTG_Core_host, USBPT_Dev, 0, 0, 100);
@@ -203,7 +251,7 @@ uint8_t USBPTD_SetupStage(USB_OTG_CORE_HANDLE* pcore, USB_SETUP_REQ* req)
 		{
 			USBPTH_HC_EP_t* pl = &USBPTH_Listeners[i];
 			uint8_t hc = pl->hc;
-			if (hc != 0) // if listener is actually allocated
+			if (hc != 0 && hc != HC_ERROR) // if listener is actually allocated
 			{
 				USBH_EpDesc_TypeDef* epDesc = pl->epDesc;
 				uint8_t epType = 0;
@@ -245,6 +293,7 @@ uint8_t USBPTD_SetupStage(USB_OTG_CORE_HANDLE* pcore, USB_SETUP_REQ* req)
 	USBPT_CtrlDataLen = req->wLength;
 	if (USBPT_CtrlData != 0) free(USBPT_CtrlData);
 	USBPT_CtrlData = malloc(USBPT_CtrlDataLen);
+
 	USBH_Status status;
 
 	// wait until previous req is finished
@@ -268,6 +317,8 @@ uint8_t USBPTD_SetupStage(USB_OTG_CORE_HANDLE* pcore, USB_SETUP_REQ* req)
 	USBPT_Dev->RequestState = CMD_WAIT;
 	USBH_CtlSendSetup (&USB_OTG_Core_host, USBPT_Dev->Control.setup.d8, USBPT_Dev->Control.hc_num_out);
 	USBPT_Dev->Control.state = CTRL_SETUP_WAIT;
+	USBPT_Dev->Control.timer = HCD_GetCurrentFrame(pcore);
+	USBPT_Dev->Control.timeout = 50;
 
 	if ((req->bmRequest & 0x80) == 0)
 	{ // H2D
@@ -522,6 +573,8 @@ uint8_t USBPTD_DataIn            (void *pcore , uint8_t epnum)
 
 uint8_t USBPTD_DataOut           (void *pcore , uint8_t epnum)
 {
+	__enable_irq();
+
 	USB_OTG_CORE_HANDLE* pcore_ = (USB_OTG_CORE_HANDLE*)pcore;
 	DCD_DEV* pdev = &(pcore_->dev);
 	uint8_t* data;
@@ -772,7 +825,7 @@ void USBPTD_UsrInit(void)
 
 void USBPTD_DeviceReset(uint8_t speed)
 {
-	HCD_ResetPort(&USB_OTG_Core_host);
+	USBPT_printf("\r\n USBPT Host Caused Reset \r\n");
 }
 
 void USBPTD_DeviceConfigured(void)
@@ -789,12 +842,12 @@ void USBPTD_DeviceResumed(void)
 
 void USBPTD_DeviceConnected(void)
 {
-	HCD_ResetPort(&USB_OTG_Core_host);
+	USBPT_printf("\r\n USBPT Host Connecting \r\n");
 }
 
 void USBPTD_DeviceDisconnected(void)
 {
-	HCD_ResetPort(&USB_OTG_Core_host);
+	USBPT_printf("\r\n USBPT Host Disconnecting \r\n");
 }
 
 
@@ -862,10 +915,10 @@ void USBPT_printf(char * format, ...)
 
 	va_list args;
 	va_start(args, format);
-	j = vsprintf(global_temp_buff, format, args);
+	j = vsprintf(USBPT_printf_buffer, format, args);
 	va_end(args);
 	for (i = 0; i < j; i++) {
-		uint8_t ch = global_temp_buff[i];
+		uint8_t ch = USBPT_printf_buffer[i];
 		if (ch == '\b') {
 			cereal_wait();
 		}

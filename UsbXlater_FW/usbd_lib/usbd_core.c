@@ -31,6 +31,7 @@
 #include "usbd_ioreq.h"
 #include "usb_dcd_int.h"
 #include <usbotg_lib/usb_bsp.h>
+#include <usb_passthrough.h>
 
 /** @addtogroup STM32_USB_OTG_DEVICE_LIBRARY
 * @{
@@ -180,7 +181,8 @@ static uint8_t USBD_SetupStage(USB_OTG_CORE_HANDLE *pdev)
 	//*
 	if (USBPT_Is_Active != 0)
 	{
-		if (USBPTD_SetupStage(pdev, &req) == USBD_OK) {
+		USBD_Status s = USBPTD_SetupStage(pdev, &req);
+		if (s == USBD_OK) {
 			return USBD_OK;
 		}
 	}

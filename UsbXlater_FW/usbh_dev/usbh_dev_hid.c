@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <core_cmInstr.h>
 #include <vcp.h>
+#include <hidrpt.h>
 #include <kbm2ctrl.h>
 
 static void USBH_ParseHIDDesc (USBH_HIDDesc_TypeDef *desc, uint8_t *buf);
@@ -73,12 +74,10 @@ void USBH_Dev_HID_FreeData(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
 			if (HID_Data != 0)
 			{
 				if (HID_Data->cb != 0) {
-					dbg_trace();
 					free(HID_Data->cb);
 				}
 			}
 		}
-		dbg_trace();
 		free(pdev->Usr_Data);
 		pdev->Usr_Data = 0;
 	}
@@ -86,25 +85,23 @@ void USBH_Dev_HID_FreeData(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
 
 void USBH_Dev_HID_DeInitDev(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
 {
-	dbg_trace();
-
 	uint8_t numIntf = pdev->device_prop.Cfg_Desc.bNumInterfaces;
 	for (int i = 0; i < numIntf; i++)
 	{
 		HID_Data_t* HID_Data = &(((HID_Data_t*)(pdev->Usr_Data))[i]);
 
-		if (HID_Data->hc_num_in != 0x00)
+		if (HID_Data->hc_num_in >= 0)
 		{
 			USB_OTG_HC_Halt(pcore, HID_Data->hc_num_in);
 			USBH_Free_Channel(pcore, HID_Data->hc_num_in);
-			HID_Data->hc_num_in = 0;
+			HID_Data->hc_num_in = -1;
 		}
 
-		if(HID_Data->hc_num_out != 0x00)
+		if(HID_Data->hc_num_out >= 0)
 		{
 			USB_OTG_HC_Halt(pcore, HID_Data->hc_num_out);
 			USBH_Free_Channel(pcore, HID_Data->hc_num_out);
-			HID_Data->hc_num_out = 0;     /* Reset the Channel as Free */
+			HID_Data->hc_num_out = -1;     /* Reset the Channel as Free */
 		}
 
 		HID_Data->start_toggle = 0;
@@ -224,10 +221,10 @@ void USBH_Dev_HID_EnumerationDone(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
 						HID_Data->poll = HID_MIN_POLL;
 					}
 					HID_Data->HIDIntInEp = (epDesc->bEndpointAddress);
-					HID_Data->hc_num_in = 0;
+					HID_Data->hc_num_in = -1;
 					#ifndef USBH_HID_ENABLE_DYNAMIC_HC_ALLOC
 					HID_Data->hc_num_in  = USBH_Alloc_Channel(pcore, epDesc->bEndpointAddress);
-					if (HID_Data->hc_num_in > 0 && HID_Data->hc_num_in < HC_ERROR)
+					if (HID_Data->hc_num_in >= 0)
 					{
 						USBH_Open_Channel  (pcore,
 											HID_Data->hc_num_in,
@@ -324,10 +321,9 @@ void USBH_Dev_HID_EnumerationDone(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
 
 	if (isHid == 0) {
 		// none of the interfaces are HID
-		dbg_trace();
 		free(pdev->Usr_Data);
 		pdev->Usr_Data = 0;
-		pdev->cb = &USBH_Dev_CB_Default;
+		pdev->cb = &USBH_Dev_CB_Default; // this will cause the device to not be serviced
 	}
 }
 
@@ -353,7 +349,8 @@ static USBH_Status USBH_HID_Handle(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev, u
   HID_Data_t* HID_Data = &(((HID_Data_t*)(pdev->Usr_Data))[intf]);
 
   #ifndef USBH_HID_ENABLE_DYNAMIC_HC_ALLOC
-  if (HID_Data->hc_num_in == 0 || HID_Data->hc_num_in == HC_ERROR) {
+  if (HID_Data->hc_num_in < 0) {
+    // no possible way to do anything
     return USBH_OK;
   }
   #endif
@@ -386,17 +383,17 @@ static USBH_Status USBH_HID_Handle(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev, u
 		}
 		// we are ready to do interrupt transfers, we do not need the control EPs anymore
 		// free them so other devices can use them
-		if (pdev->Control.hc_num_in != 0)
+		if (pdev->Control.hc_num_in >= 0)
 		{
 			USB_OTG_HC_Halt(pcore, pdev->Control.hc_num_in);
 			USBH_Free_Channel(pcore, pdev->Control.hc_num_in);
-			pdev->Control.hc_num_in = 0;
+			pdev->Control.hc_num_in = -1;
 		}
-		if (pdev->Control.hc_num_out != 0)
+		if (pdev->Control.hc_num_out >= 0)
 		{
 			USB_OTG_HC_Halt(pcore, pdev->Control.hc_num_out);
 			USBH_Free_Channel(pcore, pdev->Control.hc_num_out);
-			pdev->Control.hc_num_out = 0;
+			pdev->Control.hc_num_out = -1;
 		}
 		HID_Data->state = HID_GET_DATA;
 	break;
@@ -404,10 +401,10 @@ static USBH_Status USBH_HID_Handle(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev, u
   case HID_GET_DATA:
 
     #ifdef USBH_HID_ENABLE_DYNAMIC_HC_ALLOC
-    if (HID_Data->hc_num_in == 0)
+    if (HID_Data->hc_num_in < 0)
     {
       HID_Data->hc_num_in = USBH_Alloc_Channel(pcore, HID_Data->HIDIntInEp);
-      if (HID_Data->hc_num_in > 0 && HID_Data->hc_num_in < HC_ERROR) {
+      if (HID_Data->hc_num_in >= 0) {
 		  USBH_Open_Channel (pcore,
 							HID_Data->hc_num_in,
 							pdev->device_prop.address,
@@ -417,7 +414,7 @@ static USBH_Status USBH_HID_Handle(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev, u
 		}
     }
 
-    if (HID_Data->hc_num_in > 0 && HID_Data->hc_num_in < HC_ERROR) {
+    if (HID_Data->hc_num_in >= 0) {
     #endif
 
 
@@ -438,7 +435,7 @@ static USBH_Status USBH_HID_Handle(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev, u
     else {
       // failed to allocate
       dbg_printf(DBGMODE_ERR, "\r\n Unable to allocate channel for HID dev (addr %d, intf %d, ep 0x%02X) \r\n", pdev->device_prop.address, intf, HID_Data->HIDIntInEp);
-      HID_Data->hc_num_in = 0;
+      HID_Data->hc_num_in = -1;
     }
     #endif
     break;
@@ -492,10 +489,10 @@ static USBH_Status USBH_HID_Handle(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev, u
     #ifdef USBH_HID_ENABLE_DYNAMIC_HC_ALLOC
     if (toDeallocate != 0)
     {
-      if (HID_Data->hc_num_in != 0) {
+      if (HID_Data->hc_num_in >= 0) {
         USB_OTG_HC_Halt(pcore, HID_Data->hc_num_in);
         USBH_Free_Channel(pcore, HID_Data->hc_num_in);
-        HID_Data->hc_num_in = 0;
+        HID_Data->hc_num_in = -1;
       }
     }
     #endif
