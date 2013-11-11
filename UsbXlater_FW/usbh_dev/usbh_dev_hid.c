@@ -77,7 +77,6 @@ void USBH_Dev_HID_FreeData(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
 					free(HID_Data->cb);
 					HID_Data->cb = 0;
 				}
-				((HID_Data_t*)(pdev->Usr_Data))[i] = 0;
 			}
 		}
 		free(pdev->Usr_Data);

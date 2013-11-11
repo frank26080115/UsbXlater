@@ -382,7 +382,7 @@ void USBH_Process(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 		/* Manage User disconnect operations*/
 		if (pdev->cb != 0)
 		{
-			if ((USBH_Device_cb_TypeDef*)pdev->cb)->DeviceDisconnected != 0) {
+			if (((USBH_Device_cb_TypeDef*)pdev->cb)->DeviceDisconnected != 0) {
 				((USBH_Device_cb_TypeDef*)pdev->cb)->DeviceDisconnected(pcore, pdev);
 			}
 		}
