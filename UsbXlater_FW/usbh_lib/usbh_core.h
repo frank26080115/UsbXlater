@@ -202,6 +202,8 @@ typedef struct _Host_TypeDef
 
   uint8_t               port_num;
 
+  uint8_t               total_err;
+
   void* cb;
 
   void* Usr_Data;

@@ -77,6 +77,7 @@
   * @{
   */
 static int16_t USBH_GetFreeChannel (USB_OTG_CORE_HANDLE *pcore);
+static int16_t USBH_Alloc_Channel (USB_OTG_CORE_HANDLE *pcore, uint8_t ep_addr);
 /**
   * @}
   */
@@ -99,36 +100,40 @@ static int16_t USBH_GetFreeChannel (USB_OTG_CORE_HANDLE *pcore);
   * @param  mps: max pkt size
   * @retval Status
   */
-uint8_t USBH_Open_Channel  (USB_OTG_CORE_HANDLE *pcore,
-                            uint8_t hc_num,
+int8_t USBH_Open_Channel  (USB_OTG_CORE_HANDLE *pcore,
+                            int8_t* hc_num,
+                            uint8_t ep_num,
                             uint8_t dev_address,
                             uint8_t speed,
                             uint8_t ep_type,
                             uint16_t mps)
 {
 
-  pcore->host.hc[hc_num].ep_num = pcore->host.channel[hc_num] & 0x7F;
-  pcore->host.hc[hc_num].ep_is_in = (pcore->host.channel[hc_num] & 0x80 ) == 0x80;
-  pcore->host.hc[hc_num].dev_addr = dev_address;
-  pcore->host.hc[hc_num].ep_type = ep_type;
-  pcore->host.hc[hc_num].max_packet = mps;
-  pcore->host.hc[hc_num].speed = speed;
-  pcore->host.hc[hc_num].toggle_in = 0;
-  pcore->host.hc[hc_num].toggle_out = 0;
+  int16_t possibleHc = USBH_Alloc_Channel(pcore, ep_num);
+  *hc_num = possibleHc;
+  if (possibleHc < 0) return HC_ERROR;
+  pcore->host.hc[possibleHc].ep_num     = pcore->host.channel[possibleHc]  & 0x7F;
+  pcore->host.hc[possibleHc].ep_is_in   = (pcore->host.channel[possibleHc] & 0x80 ) == 0x80;
+  pcore->host.hc[possibleHc].dev_addr   = dev_address;
+  pcore->host.hc[possibleHc].ep_type    = ep_type;
+  pcore->host.hc[possibleHc].max_packet = mps;
+  pcore->host.hc[possibleHc].speed      = speed;
+  pcore->host.hc[possibleHc].toggle_in  = 0;
+  pcore->host.hc[possibleHc].toggle_out = 0;
   if(speed == HPRT0_PRTSPD_HIGH_SPEED)
   {
-    pcore->host.hc[hc_num].do_ping = 1;
+    pcore->host.hc[possibleHc].do_ping = 1;
   }
 
-  /*
+#ifdef USBH_HCS_ENABLE_DEBUG
   dbg_printf(DBGMODE_DEBUG, "USBH_Open_Channel, HC %d, ep# %d, is_in %d, dev_addr %d, \r\n",
-		  hc_num,
-		  pcore->host.hc[hc_num].ep_num,
-		  pcore->host.hc[hc_num].ep_is_in,
-		  pcore->host.hc[hc_num].dev_addr);
-  //*/
+		  *hc_num,
+		  pcore->host.hc[possibleHc].ep_num,
+		  pcore->host.hc[possibleHc].ep_is_in,
+		  pcore->host.hc[possibleHc].dev_addr);
+#endif
 
-  USB_OTG_HC_Init(pcore, hc_num);
+  USB_OTG_HC_Init(pcore, possibleHc);
 
   return HC_OK;
 
@@ -145,14 +150,15 @@ uint8_t USBH_Open_Channel  (USB_OTG_CORE_HANDLE *pcore,
   * @param  mps: max pkt size
   * @retval Status
   */
-uint8_t USBH_Modify_Channel(USB_OTG_CORE_HANDLE *pcore,
-                            uint8_t hc_num,
+int8_t USBH_Modify_Channel(USB_OTG_CORE_HANDLE *pcore,
+                            int8_t hc_num,
                             uint8_t dev_address,
                             uint8_t speed,
                             uint8_t ep_type,
                             uint16_t mps)
 {
 
+  if (hc_num < 0) return HC_ERROR;
   if(dev_address != 0)
   {
     pcore->host.hc[hc_num].dev_addr = dev_address;
@@ -179,13 +185,15 @@ uint8_t USBH_Modify_Channel(USB_OTG_CORE_HANDLE *pcore,
   * @param  ep_addr: End point for which the channel to be allocated
   * @retval hc_num: Host channel number
   */
-uint8_t USBH_Alloc_Channel  (USB_OTG_CORE_HANDLE *pcore, uint8_t ep_addr)
+static int16_t USBH_Alloc_Channel (USB_OTG_CORE_HANDLE *pcore, uint8_t ep_addr)
 {
   int16_t hc_num;
 
   hc_num =  USBH_GetFreeChannel(pcore);
 
-  //dbg_printf(DBGMODE_DEBUG, "USBH_Alloc_Channel HC allocated: %d\r\n", hc_num);
+#ifdef USBH_HCS_ENABLE_DEBUG
+  dbg_printf(DBGMODE_DEBUG, "USBH_Alloc_Channel HC allocated: %d\r\n", hc_num);
+#endif
 
   if (hc_num >= 0)
   {
@@ -196,16 +204,19 @@ uint8_t USBH_Alloc_Channel  (USB_OTG_CORE_HANDLE *pcore, uint8_t ep_addr)
 
 /**
   * @brief  USBH_Free_Pipe
-  *         Free the USB host channel
+  *         Free the USB host channel and halts it
   * @param  idx: Channel number to be freed
   * @retval Status
   */
-uint8_t USBH_Free_Channel  (USB_OTG_CORE_HANDLE *pcore, uint8_t idx)
+int8_t USBH_Free_Channel  (USB_OTG_CORE_HANDLE *pcore, int8_t* idx)
 {
-  if(idx < HC_MAX)
+
+  if((*idx) >= 0)
   {
-    pcore->host.channel[idx] &= HC_USED_MASK;
+    USB_OTG_HC_Halt(pcore, *idx);
+    pcore->host.channel[(*idx)] &= HC_USED_MASK;
   }
+  (*idx) = -1;
   return USBH_OK;
 }
 
@@ -239,11 +250,13 @@ static int16_t USBH_GetFreeChannel (USB_OTG_CORE_HANDLE *pcore)
 
   for (idx = 0 ; idx < HC_MAX ; idx++)
   {
-	if ((pcore->host.channel[idx] & HC_USED) == 0)
-	{
-	   //dbg_printf(DBGMODE_DEBUG, "USBH_GetFreeChannel HC allocated: %d\r\n", idx);
-	   return idx;
-	}
+    if ((pcore->host.channel[idx] & HC_USED) == 0)
+    {
+#ifdef USBH_HCS_ENABLE_DEBUG
+       dbg_printf(DBGMODE_DEBUG, "USBH_GetFreeChannel HC allocated: %d\r\n", idx);
+#endif
+       return idx;
+    }
   }
   return HC_ERROR;
 }

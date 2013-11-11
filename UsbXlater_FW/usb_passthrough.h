@@ -19,7 +19,8 @@ extern USBH_Device_cb_TypeDef USBPT_Host_cb;
 
 typedef struct
 {
-	uint8_t hc;
+	int8_t used;
+	int8_t hc;
 	USBH_EpDesc_TypeDef* epDesc;
 }
 USBPTH_HC_EP_t;

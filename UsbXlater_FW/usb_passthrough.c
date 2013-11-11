@@ -45,7 +45,8 @@ void USBPT_Init(USBH_DEV* pdev)
 	USBPT_Dev = pdev;
 
 	for (uint8_t i = 0; i < USBPTH_MAX_LISTENERS; i++) {
-		USBPTH_Listeners[i].hc = 0;
+		USBPTH_Listeners[i].used = 0;
+		USBPTH_Listeners[i].hc   = -1;
 	}
 
 	// most of the device event handlers are spawned within ISRs
@@ -73,23 +74,22 @@ void USBPT_Work()
 		{
 			USBPT_printf("USBPT Device Connecting \r\n");
 
-			USBPT_Dev->Control.hc_num_out = USBH_Alloc_Channel(&USB_OTG_Core_host, 0x00);
-			USBPT_Dev->Control.hc_num_in  = USBH_Alloc_Channel(&USB_OTG_Core_host, 0x80);
-			if (USBPT_Dev->Control.hc_num_out >= 0 && USBPT_Dev->Control.hc_num_in >= 0)
-			{
-				USBH_Open_Channel(	&USB_OTG_Core_host,
-					USBPT_Dev->Control.hc_num_in,
+			if (USBH_Open_Channel(	&USB_OTG_Core_host,
+					&(USBPT_Dev->Control.hc_num_in),
+					0x80,
 					USBPT_Dev->device_prop.address, // still 0 at this point
 					USBPT_Dev->device_prop.speed,
 					EP_TYPE_CTRL,
-					USBPT_Dev->Control.ep0size);
+					USBPT_Dev->Control.ep0size) == HC_OK
+				&&
 				USBH_Open_Channel(	&USB_OTG_Core_host,
-					USBPT_Dev->Control.hc_num_out,
+					&(USBPT_Dev->Control.hc_num_out),
+					0x00,
 					USBPT_Dev->device_prop.address, // still 0 at this point
 					USBPT_Dev->device_prop.speed,
 					EP_TYPE_CTRL,
-					USBPT_Dev->Control.ep0size);
-
+					USBPT_Dev->Control.ep0size) == HC_OK
+			) {
 				DCD_DevConnect(&USB_OTG_Core_dev);
 				USBPT_Has_Dev = 1;
 			}
@@ -114,28 +114,19 @@ void USBPT_Work()
 
 			for (uint8_t i = 0; i < USBPTH_MAX_LISTENERS; i++)
 			{
-				if (USBPTH_Listeners[i].hc != 0 && USBPTH_Listeners[i].hc != HC_ERROR)
-				{
-					USBH_Free_Channel(&USB_OTG_Core_host, USBPTH_Listeners[i].hc);
-					USBPTH_Listeners[i].hc = 0;
-				}
+				USBH_Free_Channel(&USB_OTG_Core_host, &(USBPTH_Listeners[i].hc));
 			}
 
-			if (USBPT_Dev->Control.hc_num_out >= 0 && USBPT_Dev->Control.hc_num_in >= 0)
-			{
-				USBH_Free_Channel(&USB_OTG_Core_host, USBPT_Dev->Control.hc_num_out);
-				USBH_Free_Channel(&USB_OTG_Core_host, USBPT_Dev->Control.hc_num_in);
-				USBPT_Dev->Control.hc_num_in = -1;
-				USBPT_Dev->Control.hc_num_out = -1;
-			}
+			USBH_Free_Channel(&USB_OTG_Core_host, &(USBPT_Dev->Control.hc_num_out));
+			USBH_Free_Channel(&USB_OTG_Core_host, &(USBPT_Dev->Control.hc_num_in));
 		}
 	}
 
 	for (uint8_t i = 0; i < USBPTH_MAX_LISTENERS; i++)
 	{
 		USBPTH_HC_EP_t* pl = &USBPTH_Listeners[i];
-		uint8_t hc = USBPTH_Listeners[i].hc;
-		if (hc != 0 && hc != HC_ERROR) // if listener is actually allocated
+		int8_t hc = USBPTH_Listeners[i].hc;
+		if (hc >= 0) // if listener is actually allocated
 		{
 			USBH_EpDesc_TypeDef* epDesc = pl->epDesc;
 			uint8_t epnum = epDesc->bEndpointAddress;
@@ -382,38 +373,34 @@ uint8_t USBPTD_SetupStage(USB_OTG_CORE_HANDLE* pcore, USB_SETUP_REQ* req)
 						USBH_EpDesc_TypeDef* epDesc = &USBPT_Dev->device_prop.Ep_Desc[i][j];
 						for (uint8_t k = 0; k < USBPTH_MAX_LISTENERS; k++)
 						{
-							if ((epDesc->bEndpointAddress & USB_EP_DIR_MSK) == USB_D2H && USBPTH_Listeners[k].hc == 0)
+							if ((epDesc->bEndpointAddress & USB_EP_DIR_MSK) == USB_D2H && USBPTH_Listeners[k].used == 0)
 							{
 								USBPTH_Listeners[k].epDesc = epDesc;
-								USBPTH_Listeners[k].hc = USBH_Alloc_Channel(&USB_OTG_Core_host, epDesc->bEndpointAddress);
-								if (USBPTH_Listeners[k].hc == HC_ERROR)
-								{
-									USBPTH_Listeners[k].hc = 0;
+								uint8_t epType = 0;
+								if ((epDesc->bmAttributes & USB_EP_TYPE_INTR) == USB_EP_TYPE_INTR) {
+									epType = EP_TYPE_INTR;
 								}
-								else if (USBPTH_Listeners[k].hc != 0)
+								else if ((epDesc->bmAttributes & USB_EP_TYPE_INTR) == USB_EP_TYPE_BULK) {
+									epType = EP_TYPE_BULK;
+								}
+								else if ((epDesc->bmAttributes & USB_EP_TYPE_INTR) == USB_EP_TYPE_ISOC) {
+									epType = EP_TYPE_ISOC;
+								}
+								else if ((epDesc->bmAttributes & USB_EP_TYPE_INTR) == USB_EP_TYPE_CTRL) {
+									epType = EP_TYPE_CTRL;
+								}
+
+								USBH_Open_Channel(	&USB_OTG_Core_host,
+													&(USBPTH_Listeners[k].hc),
+													epDesc->bEndpointAddress,
+													USBPT_Dev->device_prop.address,
+													USBPT_Dev->device_prop.speed,
+													epType,
+													USBPTH_Listeners[k].epDesc->wMaxPacketSize);
+
+								if (USBPTH_Listeners[k].hc >= 0)
 								{
-
-									uint8_t epType = 0;
-									if ((epDesc->bmAttributes & USB_EP_TYPE_INTR) == USB_EP_TYPE_INTR) {
-										epType = EP_TYPE_INTR;
-									}
-									else if ((epDesc->bmAttributes & USB_EP_TYPE_INTR) == USB_EP_TYPE_BULK) {
-										epType = EP_TYPE_BULK;
-									}
-									else if ((epDesc->bmAttributes & USB_EP_TYPE_INTR) == USB_EP_TYPE_ISOC) {
-										epType = EP_TYPE_ISOC;
-									}
-									else if ((epDesc->bmAttributes & USB_EP_TYPE_INTR) == USB_EP_TYPE_CTRL) {
-										epType = EP_TYPE_CTRL;
-									}
-
-									USBH_Open_Channel(	&USB_OTG_Core_host,
-														USBPTH_Listeners[k].hc,
-														USBPT_Dev->device_prop.address,
-														USBPT_Dev->device_prop.speed,
-														epType,
-														USBPTH_Listeners[k].epDesc->wMaxPacketSize);
-
+									USBPTH_Listeners[k].used = 1;
 									DCD_EP_Open(&USB_OTG_Core_dev, epDesc->bEndpointAddress, epDesc->wMaxPacketSize, epType);
 
 									if (epDesc->wMaxPacketSize > USBPT_GeneralInDataMax) {
@@ -573,8 +560,6 @@ uint8_t USBPTD_DataIn            (void *pcore , uint8_t epnum)
 
 uint8_t USBPTD_DataOut           (void *pcore , uint8_t epnum)
 {
-	__enable_irq();
-
 	USB_OTG_CORE_HANDLE* pcore_ = (USB_OTG_CORE_HANDLE*)pcore;
 	DCD_DEV* pdev = &(pcore_->dev);
 	uint8_t* data;
@@ -660,7 +645,7 @@ uint8_t USBPTD_DataOut           (void *pcore , uint8_t epnum)
 		if (epDesc != 0) // EP found
 		{
 			uint8_t epType = 0;
-			uint8_t hc = 0;
+			int8_t hc = -1;
 			if ((epDesc->bmAttributes & USB_EP_TYPE_INTR) == USB_EP_TYPE_INTR) {
 				epType = EP_TYPE_INTR;
 			}
@@ -672,15 +657,14 @@ uint8_t USBPTD_DataOut           (void *pcore , uint8_t epnum)
 			}
 
 			// dynamically allocate host channel for use
-			hc = USBH_Alloc_Channel(&USB_OTG_Core_host, epnum);
-			if (hc != 0 && hc != HC_ERROR)
-			{
-				USBH_Open_Channel(	&USB_OTG_Core_host,
-									hc,
+			if (USBH_Open_Channel(	&USB_OTG_Core_host,
+									&hc,
+									epnum,
 									USBPT_Dev->device_prop.address,
 									USBPT_Dev->device_prop.speed,
 									epType,
-									epDesc->wMaxPacketSize);
+									epDesc->wMaxPacketSize) == HC_OK)
+			{
 
 				// try to only send on even frame
 				volatile uint32_t syncTries = 0x7FFFFFFF;
@@ -729,8 +713,7 @@ uint8_t USBPTD_DataOut           (void *pcore , uint8_t epnum)
 				}
 
 				// free the channel to be used by something else later
-				USB_OTG_HC_Halt(&USB_OTG_Core_host, hc);
-				USBH_Free_Channel(&USB_OTG_Core_host, hc);
+				USBH_Free_Channel(&USB_OTG_Core_host, &hc);
 			}
 			else
 			{

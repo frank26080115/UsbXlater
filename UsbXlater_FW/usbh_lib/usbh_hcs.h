@@ -48,6 +48,9 @@
 /** @defgroup USBH_HCS_Exported_Defines
   * @{
   */
+
+//#define USBH_HCS_ENABLE_DEBUG
+
 #define HC_MAX           8
 
 #define HC_OK            0x0000
@@ -84,24 +87,23 @@
   * @{
   */
 
-uint8_t USBH_Alloc_Channel(USB_OTG_CORE_HANDLE *pcore, uint8_t ep_addr);
-
-uint8_t USBH_Free_Channel  (USB_OTG_CORE_HANDLE *pcore, uint8_t idx);
+int8_t USBH_Free_Channel  (USB_OTG_CORE_HANDLE *pcore, int8_t* idx);
 
 uint8_t USBH_DeAllocate_AllChannel  (USB_OTG_CORE_HANDLE *pcore);
 
-uint8_t USBH_Open_Channel  (USB_OTG_CORE_HANDLE *pcore,
-                            uint8_t ch_num,
-                            uint8_t dev_address,
-                            uint8_t speed,
-                            uint8_t ep_type,
+int8_t USBH_Open_Channel  (USB_OTG_CORE_HANDLE *pcore,
+                            int8_t*  hc_num,
+                            uint8_t  ep_num,
+                            uint8_t  dev_address,
+                            uint8_t  speed,
+                            uint8_t  ep_type,
                             uint16_t mps);
 
-uint8_t USBH_Modify_Channel (USB_OTG_CORE_HANDLE *pcore,
-                            uint8_t hc_num,
-                            uint8_t dev_address,
-                            uint8_t speed,
-                            uint8_t ep_type,
+int8_t USBH_Modify_Channel (USB_OTG_CORE_HANDLE *pcore,
+                            int8_t   hc_num,
+                            uint8_t  dev_address,
+                            uint8_t  speed,
+                            uint8_t  ep_type,
                             uint16_t mps);
 /**
   * @}

@@ -43,18 +43,8 @@ USBH_Status USBH_Dev_DefaultCB_Task(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 		Hub_Data_t* hubData = (Hub_Data_t*)parentHub->Usr_Data;
 		hubData->port_busy = 0;
 		// this is a useless device, free the channel so another dev can use them
-		if (pdev->Control.hc_num_in >= 0)
-		{
-			USB_OTG_HC_Halt(pcore, pdev->Control.hc_num_in);
-			USBH_Free_Channel(pcore, pdev->Control.hc_num_in);
-			pdev->Control.hc_num_in = -1;
-		}
-		if (pdev->Control.hc_num_out >= 0)
-		{
-			USB_OTG_HC_Halt(pcore, pdev->Control.hc_num_out);
-			USBH_Free_Channel(pcore, pdev->Control.hc_num_out);
-			pdev->Control.hc_num_out = -1;
-		}
+		USBH_Free_Channel(pcore, &(pdev->Control.hc_num_in));
+		USBH_Free_Channel(pcore, &(pdev->Control.hc_num_out));
 	}
 
 	return USBH_OK;
@@ -153,8 +143,7 @@ void USBH_Dev_DefaultCB_SerialNumString(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *p
 
 void USBH_Dev_DefaultCB_EnumerationDone(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 {
-	dbg_trace();
-	// DeviceDescAvailable should have reassigned this already
+	vcp_printf("Unknown Class Device V%04XP%04XA%d Enumerated\r\n", pdev->device_prop.Dev_Desc.idVendor, pdev->device_prop.Dev_Desc.idProduct, pdev->device_prop.address);
 }
 
 void USBH_Dev_DefaultCB_DeviceNotSupported(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)

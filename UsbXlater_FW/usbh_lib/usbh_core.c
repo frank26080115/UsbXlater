@@ -210,16 +210,10 @@ USBH_Status USBH_DeInit(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
 	pdev->device_prop.address = USBH_DEVICE_ADDRESS_DEFAULT;
 	pdev->device_prop.speed = HPRT0_PRTSPD_FULL_SPEED;
 
-	if (pdev->Control.hc_num_in >= 0) {
-		USB_OTG_HC_Halt(pcore, pdev->Control.hc_num_in);
-	}
-	if (pdev->Control.hc_num_out >= 0) {
-		USB_OTG_HC_Halt(pcore, pdev->Control.hc_num_out);
-	}
-	USBH_Free_Channel(pcore, pdev->Control.hc_num_in);
-	USBH_Free_Channel(pcore, pdev->Control.hc_num_out);
-	pdev->Control.hc_num_in = -1;
-	pdev->Control.hc_num_out = -1;
+	pdev->total_err = 0;
+
+	USBH_Free_Channel(pcore, &(pdev->Control.hc_num_in));
+	USBH_Free_Channel(pcore, &(pdev->Control.hc_num_out));
 
 	return USBH_OK;
 }
@@ -271,7 +265,7 @@ void USBH_Process(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 			if (USBH_Dev_Reset_Timer == 0) {
 				USBH_Dev_Reset_Timer = HCD_GetCurrentFrame(pcore);
 			}
-			else if ((HCD_GetCurrentFrame(pcore) - USBH_Dev_Reset_Timer) > 100) {
+			else if ((HCD_GetCurrentFrame(pcore) - USBH_Dev_Reset_Timer) > 150) {
 				pdev->gState = HOST_DEV_ATTACHED;
 				dbg_printf(DBGMODE_TRACE, "USBH new device attached HOST_DEV_ATTACHED \r\n");
 			}
@@ -287,15 +281,33 @@ void USBH_Process(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 		// once the reset is done, the hub should receive an interrupt-in packet indicating, which is where the new state HOST_DEV_DELAY is set
 		break;
 	case HOST_DEV_DELAY :
-		if ((HCD_GetCurrentFrame(pcore) - USBH_Dev_Reset_Timer) > 100) {
+		if ((HCD_GetCurrentFrame(pcore) - USBH_Dev_Reset_Timer) > 150) {
 			pdev->gState = HOST_DEV_ATTACHED;
 		}
 		break;
 	case HOST_DEV_ATTACHED :
 
+		if (USBH_Open_Channel(	pcore,
+							&(pdev->Control.hc_num_in),
+							0x80,
+							pdev->device_prop.address, // still 0 at this point
+							pdev->device_prop.speed,
+							EP_TYPE_CTRL,
+							pdev->Control.ep0size) != HC_OK) {
+			dbg_printf(DBGMODE_ERR, "Unable to open control-in-EP\r\n");
+			break;
+		}
+		if (USBH_Open_Channel(	pcore,
+							&(pdev->Control.hc_num_out),
+							0x00,
+							pdev->device_prop.address, // still 0 at this point
+							pdev->device_prop.speed,
+							EP_TYPE_CTRL,
+							pdev->Control.ep0size) != HC_OK) {
+			dbg_printf(DBGMODE_ERR, "Unable to open control-out-EP\r\n");
+			break;
+		}
 		((USBH_Device_cb_TypeDef*)pdev->cb)->DeviceAttached(pcore, pdev);
-		pdev->Control.hc_num_out = USBH_Alloc_Channel(pcore, 0x00);
-		pdev->Control.hc_num_in  = USBH_Alloc_Channel(pcore, 0x80);
 
 		/* Reset USB Device */
 		if (isDevRoot)
@@ -308,34 +320,10 @@ void USBH_Process(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 				*/
 			pdev->device_prop.speed = HCD_GetCurrentSpeed(pcore);
 			((USBH_Device_cb_TypeDef*)pdev->cb)->DeviceSpeedDetected(pcore, pdev, pdev->device_prop.speed);
-		}
 
 			pdev->gState = HOST_ENUMERATION;
-
-			// Open Control pipes
-			if (pdev->Control.hc_num_in >= 0 && pdev->Control.hc_num_out >= 0)
-			{
-				USBH_Open_Channel(	pcore,
-									pdev->Control.hc_num_in,
-									pdev->device_prop.address, // still 0 at this point
-									pdev->device_prop.speed,
-									EP_TYPE_CTRL,
-									pdev->Control.ep0size);
-
-				USBH_Open_Channel(	pcore,
-									pdev->Control.hc_num_out,
-									pdev->device_prop.address, // still 0 at this point
-									pdev->device_prop.speed,
-									EP_TYPE_CTRL,
-									pdev->Control.ep0size);
-			}
-			else {
-				pdev->gState = HOST_DEV_ATTACHED; // retry
-				dbg_printf(DBGMODE_ERR, "Unable to open control EP \r\n");
-				break;
-			}
-
-		if (isDevRoot == 0)
+		}
+		else
 		{
 			pdev->gState = HOST_ENUMERATION_DELAY;
 			USBH_Dev_Reset_Timer = HCD_GetCurrentFrame(pcore);
@@ -343,7 +331,7 @@ void USBH_Process(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 		break;
 
 	case HOST_ENUMERATION_DELAY:
-		if ((HCD_GetCurrentFrame(pcore) - USBH_Dev_Reset_Timer) > 100) {
+		if ((HCD_GetCurrentFrame(pcore) - USBH_Dev_Reset_Timer) > 150) {
 			pdev->gState = HOST_ENUMERATION;
 		}
 	break;
@@ -392,17 +380,31 @@ void USBH_Process(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 	// only applies to root device, because memory needs to be freed for child devices
 
 		/* Manage User disconnect operations*/
-		((USBH_Device_cb_TypeDef*)pdev->cb)->DeviceDisconnected(pcore, pdev);
+		if (pdev->cb != 0)
+		{
+			if ((USBH_Device_cb_TypeDef*)pdev->cb)->DeviceDisconnected != 0) {
+				((USBH_Device_cb_TypeDef*)pdev->cb)->DeviceDisconnected(pcore, pdev);
+			}
+		}
 
 		/* Re-Initilaize Host for new Enumeration */
 		USBH_DeInit(pcore, pdev);
-		((USBH_Device_cb_TypeDef*)pdev->cb)->DeInit(pcore, pdev);
-		((USBH_Device_cb_TypeDef*)pdev->cb)->DeInitDev(pcore, pdev);
-	if (isDevRoot) {
-		USBH_DeAllocate_AllChannel(pcore);
-		USBH_Dev_Reset_Timer = 0;
-		pdev->cb = &USBH_Dev_CB_Default;
-	}
+
+		if (pdev->cb != 0)
+		{
+			if (((USBH_Device_cb_TypeDef*)pdev->cb)->DeInit != 0) {
+				((USBH_Device_cb_TypeDef*)pdev->cb)->DeInit(pcore, pdev);
+			}
+			if (((USBH_Device_cb_TypeDef*)pdev->cb)->DeInitDev != 0) {
+				((USBH_Device_cb_TypeDef*)pdev->cb)->DeInitDev(pcore, pdev);
+			}
+		}
+
+		if (isDevRoot) {
+			USBH_DeAllocate_AllChannel(pcore);
+			USBH_Dev_Reset_Timer = 0;
+			pdev->cb = &USBH_Dev_CB_Default;
+		}
 		pdev->gState = HOST_IDLE;
 
 		break;
@@ -487,7 +489,7 @@ static USBH_Status USBH_HandleEnum(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
     break;
 
   case ENUM_GET_FULL_DEV_DESC_WAIT:
-    if ((HCD_GetCurrentFrame(pcore) - USBH_Dev_Reset_Timer) > 100) {
+    if ((HCD_GetCurrentFrame(pcore) - USBH_Dev_Reset_Timer) > 150) {
       USBH_Modify_Channel (pcore,
                            pdev->Control.hc_num_out,
                            0,
@@ -947,11 +949,18 @@ USBH_Status USBH_HandleControl (USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
 
       status = USBH_FAIL;
       dbg_printf(DBGMODE_ERR, "USBH_HandleControl CTRL_ERROR Reached USBH_MAX_ERROR_COUNT \r\n");
+      pdev->total_err++;
+      if (pdev->total_err > 16) {
+        pdev->gState = HOST_DEV_DISCONNECTED;
+        dbg_printf(DBGMODE_ERR, "Too many errors for device, pretending to disconnect... \r\n");
+      }
     }
     break;
 
   case CTRL_COMPLETE:
     status = USBH_OK;
+    if (pdev->total_err > 0)
+      pdev->total_err--;
     break;
 
   case CTRL_IDLE:

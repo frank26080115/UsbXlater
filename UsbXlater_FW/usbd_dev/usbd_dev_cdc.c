@@ -117,6 +117,22 @@ uint8_t USBD_CDC_LangIDDesc[USB_SIZ_STRING_LANGID] = {
 	0x09, 0x04,
 };
 
+struct cdc_linecodeing_t {
+	uint32_t bitrate;
+	uint8_t  format;
+	uint8_t  paritytype;
+	uint8_t  datatype;
+}
+cdc_linecoding =
+{
+	115200, /* baud rate*/
+	0x00,   /* stop bits-1*/
+	0x00,   /* parity - none*/
+	0x08    /* nb. of bits 8*/
+};
+#define CDC_GET_LINE_CODING 0x21
+#define CDC_SET_LINE_CODING 0x20
+
 static char USBD_CDC_InFlight = 0;
 volatile ringbuffer_t USBD_CDC_H2D_FIFO;
 volatile ringbuffer_t USBD_CDC_D2H_FIFO;
@@ -218,10 +234,14 @@ static uint8_t  USBD_CDC_Setup (void  *pdev, USB_SETUP_REQ *req)
 					// nothing to do
 					//VCP_Ctrl(req->bRequest, CmdBuff, req->wLength);
 
+					if (req->bRequest == CDC_GET_LINE_CODING) {
+						memcpy(USBD_CDC_CMD_Buff, &cdc_linecoding, req->wLength);
+					}
+
 					/* Send the data to the host */
 					USBD_CtlSendData (pdev, USBD_CDC_CMD_Buff, req->wLength);
 				}
-				else /* Host-to-Device requeset */
+				else /* Host-to-Device request */
 				{
 					/* Set the value of the current command to be processed */
 					// nothing to do

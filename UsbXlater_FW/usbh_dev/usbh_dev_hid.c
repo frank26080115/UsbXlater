@@ -75,7 +75,9 @@ void USBH_Dev_HID_FreeData(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
 			{
 				if (HID_Data->cb != 0) {
 					free(HID_Data->cb);
+					HID_Data->cb = 0;
 				}
+				((HID_Data_t*)(pdev->Usr_Data))[i] = 0;
 			}
 		}
 		free(pdev->Usr_Data);
@@ -90,21 +92,12 @@ void USBH_Dev_HID_DeInitDev(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
 	{
 		HID_Data_t* HID_Data = &(((HID_Data_t*)(pdev->Usr_Data))[i]);
 
-		if (HID_Data->hc_num_in >= 0)
+		if (HID_Data != 0)
 		{
-			USB_OTG_HC_Halt(pcore, HID_Data->hc_num_in);
-			USBH_Free_Channel(pcore, HID_Data->hc_num_in);
-			HID_Data->hc_num_in = -1;
+			USBH_Free_Channel(pcore, &(HID_Data->hc_num_in));
+			USBH_Free_Channel(pcore, &(HID_Data->hc_num_out));
+			HID_Data->start_toggle = 0;
 		}
-
-		if(HID_Data->hc_num_out >= 0)
-		{
-			USB_OTG_HC_Halt(pcore, HID_Data->hc_num_out);
-			USBH_Free_Channel(pcore, HID_Data->hc_num_out);
-			HID_Data->hc_num_out = -1;     /* Reset the Channel as Free */
-		}
-
-		HID_Data->start_toggle = 0;
 	}
 
 	USBH_Dev_HID_FreeData(pcore, pdev);
@@ -223,21 +216,19 @@ void USBH_Dev_HID_EnumerationDone(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
 					HID_Data->HIDIntInEp = (epDesc->bEndpointAddress);
 					HID_Data->hc_num_in = -1;
 					#ifndef USBH_HID_ENABLE_DYNAMIC_HC_ALLOC
-					HID_Data->hc_num_in  = USBH_Alloc_Channel(pcore, epDesc->bEndpointAddress);
-					if (HID_Data->hc_num_in >= 0)
-					{
-						USBH_Open_Channel  (pcore,
-											HID_Data->hc_num_in,
+					if (USBH_Open_Channel  (pcore,
+											&(HID_Data->hc_num_in),
+											epDesc->bEndpointAddress,
 											pdev->device_prop.address,
 											pdev->device_prop.speed,
 											EP_TYPE_INTR,
-											HID_Data->length);
-
-						dbg_printf(DBGMODE_DEBUG, "Inter-In EP allocated, intf: %d, ep: 0x%02X, len: %d\r\n", i, epDesc->bEndpointAddress, epDesc->wMaxPacketSize);
+											HID_Data->length) < 0)
+					{
+						dbg_printf(DBGMODE_DEBUG, "Unable to allocate Inter-In EP, intf: %d, ep: 0x%02X \r\n", i, epDesc->bEndpointAddress);
 					}
 					else
 					{
-						dbg_printf(DBGMODE_DEBUG, "Unable to allocate Inter-In EP, intf: %d, ep: 0x%02X \r\n", i, epDesc->bEndpointAddress);
+						dbg_printf(DBGMODE_DEBUG, "Inter-In EP allocated, intf: %d, ep: 0x%02X, len: %d\r\n", i, epDesc->bEndpointAddress, epDesc->wMaxPacketSize);
 					}
 					#endif
 				}
@@ -247,9 +238,9 @@ void USBH_Dev_HID_EnumerationDone(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
 					continue;
 
 					HID_Data->HIDIntOutEp = (epDesc->bEndpointAddress);
-					HID_Data->hc_num_out  = USBH_Alloc_Channel(pcore, epDesc->bEndpointAddress);
 					USBH_Open_Channel  (pcore,
-										HID_Data->hc_num_out,
+										&(HID_Data->hc_num_out),
+										epDesc->bEndpointAddress,
 										pdev->device_prop.address,
 										pdev->device_prop.speed,
 										EP_TYPE_INTR,
@@ -289,7 +280,7 @@ void USBH_Dev_HID_EnumerationDone(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
 
 			HID_Rpt_Desc_Parse(pcore->host.Rx_Buffer, HID_Data->HID_Desc.wItemLength, &HID_Data->parserParams, i);
 			//dbg_printf(DBGMODE_DEBUG, "HID_Rpt_Desc_Parse Complete \r\n");
-			HID_Rep_Parsing_Params_Debug_Dump(&HID_Data->parserParams);
+			HID_Rep_Parsing_Params_Debug_Dump(&(HID_Data->parserParams));
 		}
 		else {
 			dbg_printf(DBGMODE_ERR, "USBH_Get_HID_ReportDescriptor failed status: 0x%04X\r\n", status);
@@ -383,18 +374,8 @@ static USBH_Status USBH_HID_Handle(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev, u
 		}
 		// we are ready to do interrupt transfers, we do not need the control EPs anymore
 		// free them so other devices can use them
-		if (pdev->Control.hc_num_in >= 0)
-		{
-			USB_OTG_HC_Halt(pcore, pdev->Control.hc_num_in);
-			USBH_Free_Channel(pcore, pdev->Control.hc_num_in);
-			pdev->Control.hc_num_in = -1;
-		}
-		if (pdev->Control.hc_num_out >= 0)
-		{
-			USB_OTG_HC_Halt(pcore, pdev->Control.hc_num_out);
-			USBH_Free_Channel(pcore, pdev->Control.hc_num_out);
-			pdev->Control.hc_num_out = -1;
-		}
+		USBH_Free_Channel(pcore, &(pdev->Control.hc_num_in));
+		USBH_Free_Channel(pcore, &(pdev->Control.hc_num_out));
 		HID_Data->state = HID_GET_DATA;
 	break;
 
