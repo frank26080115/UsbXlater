@@ -166,8 +166,8 @@ void HID_Rpt_Parsing_Params_Reset(HID_Rpt_Parsing_Params_t* x)
 void HID_Rep_Parsing_Params_Debug_Dump(HID_Rpt_Parsing_Params_t* x)
 {
 	uint8_t* xp = (uint8_t*)x;
-	dbg_printf(DBGMODE_DEBUG, "\r\n Parsing_Params Dump: ");
-	vcp_printf("\r\n Parsing_Params Dump: ");
+	dbg_printf(DBGMODE_DEBUG, "Parsing_Params Dump: ");
+	vcp_printf("Parsing_Params Dump: ");
 	for (int i = 0; i < sizeof(HID_Rpt_Parsing_Params_t); i++) {
 		dbg_printf(DBGMODE_DEBUG, "0x%02X ", xp[i]);
 		vcp_printf("0x%02X ", xp[i]);

@@ -180,7 +180,7 @@ USBD_Status  USBD_StdDevReq (USB_OTG_CORE_HANDLE  *pdev, USB_SETUP_REQ  *req)
     break;
 
   default:
-    dbg_printf(DBGMODE_ERR, "\r\n USBD_StdDevReq Stall, unknown bRequest 0x%02X, file " __FILE__ ":%d\r\n", req->bRequest, __LINE__);
+    dbg_printf(DBGMODE_ERR, "USBD_StdDevReq Stall, unknown bRequest 0x%02X, file " __FILE__ ":%d\r\n", req->bRequest, __LINE__);
     USBD_CtlError(pdev , req);
     break;
   }
@@ -214,13 +214,13 @@ USBD_Status  USBD_StdItfReq (USB_OTG_CORE_HANDLE  *pdev, USB_SETUP_REQ  *req)
     }
     else
     {
-       dbg_printf(DBGMODE_ERR, "\r\n USBD_StdItfReq Stall, unknown wIndex 0x%04X, file " __FILE__ ":%d\r\n", req->wIndex, __LINE__);
+       dbg_printf(DBGMODE_ERR, "USBD_StdItfReq Stall, unknown wIndex 0x%04X, file " __FILE__ ":%d\r\n", req->wIndex, __LINE__);
        USBD_CtlError(pdev , req);
     }
     break;
 
   default:
-     dbg_printf(DBGMODE_ERR, "\r\n USBD_StdItfReq Stall, unknown device_status 0x%02X, file " __FILE__ ":%d\r\n", pdev->dev.device_status, __LINE__);
+     dbg_printf(DBGMODE_ERR, "USBD_StdItfReq Stall, unknown device_status 0x%02X, file " __FILE__ ":%d\r\n", pdev->dev.device_status, __LINE__);
      USBD_CtlError(pdev , req);
     break;
   }
@@ -252,7 +252,7 @@ USBD_Status  USBD_StdEPReq (USB_OTG_CORE_HANDLE  *pdev, USB_SETUP_REQ  *req)
     case USB_OTG_ADDRESSED:
       if ((ep_addr != 0x00) && (ep_addr != 0x80))
       {
-        dbg_printf(DBGMODE_ERR, "\r\n USBD_StdEPReq Stall, bad EP op before config is set, ep 0x%02X, dev_status 0x%02X, file " __FILE__ ":%d\r\n", ep_addr, pdev->dev.device_status, __LINE__);
+        dbg_printf(DBGMODE_ERR, "USBD_StdEPReq Stall, bad EP op before config is set, ep 0x%02X, dev_status 0x%02X, file " __FILE__ ":%d\r\n", ep_addr, pdev->dev.device_status, __LINE__);
         DCD_EP_Stall(pdev , ep_addr);
       }
       break;
@@ -262,7 +262,7 @@ USBD_Status  USBD_StdEPReq (USB_OTG_CORE_HANDLE  *pdev, USB_SETUP_REQ  *req)
       {
         if ((ep_addr != 0x00) && (ep_addr != 0x80))
         {
-          dbg_printf(DBGMODE_DEBUG, "\r\n USBD_StdEPReq Stall, USB_REQ_SET_FEATURE USB_FEATURE_EP_HALT, file " __FILE__ ":%d\r\n", __LINE__);
+          dbg_printf(DBGMODE_DEBUG, "USBD_StdEPReq Stall, USB_REQ_SET_FEATURE USB_FEATURE_EP_HALT, file " __FILE__ ":%d\r\n", __LINE__);
           DCD_EP_Stall(pdev , ep_addr);
         }
       }
@@ -272,7 +272,7 @@ USBD_Status  USBD_StdEPReq (USB_OTG_CORE_HANDLE  *pdev, USB_SETUP_REQ  *req)
       break;
 
     default:
-      dbg_printf(DBGMODE_DEBUG, "\r\n USBD_StdEPReq Stall, unknown device_status 0x%02X, file " __FILE__ ":%d\r\n", pdev->dev.device_status, __LINE__);
+      dbg_printf(DBGMODE_DEBUG, "USBD_StdEPReq Stall, unknown device_status 0x%02X, file " __FILE__ ":%d\r\n", pdev->dev.device_status, __LINE__);
       USBD_CtlError(pdev , req);
       break;
     }
@@ -285,7 +285,7 @@ USBD_Status  USBD_StdEPReq (USB_OTG_CORE_HANDLE  *pdev, USB_SETUP_REQ  *req)
     case USB_OTG_ADDRESSED:
       if ((ep_addr != 0x00) && (ep_addr != 0x80))
       {
-        dbg_printf(DBGMODE_ERR, "\r\n USBD_StdEPReq Stall, bad EP op before config is set, ep 0x%02X, dev_status 0x%02X, file " __FILE__ ":%d\r\n", ep_addr, pdev->dev.device_status, __LINE__);
+        dbg_printf(DBGMODE_ERR, "USBD_StdEPReq Stall, bad EP op before config is set, ep 0x%02X, dev_status 0x%02X, file " __FILE__ ":%d\r\n", ep_addr, pdev->dev.device_status, __LINE__);
         DCD_EP_Stall(pdev , ep_addr);
       }
       break;
@@ -303,7 +303,7 @@ USBD_Status  USBD_StdEPReq (USB_OTG_CORE_HANDLE  *pdev, USB_SETUP_REQ  *req)
       break;
 
     default:
-       dbg_printf(DBGMODE_DEBUG, "\r\n USBD_StdEPReq Stall, unknown device_status 0x%02X, file " __FILE__ ":%d\r\n", pdev->dev.device_status, __LINE__);
+       dbg_printf(DBGMODE_DEBUG, "USBD_StdEPReq Stall, unknown device_status 0x%02X, file " __FILE__ ":%d\r\n", pdev->dev.device_status, __LINE__);
        USBD_CtlError(pdev , req);
       break;
     }
@@ -315,7 +315,7 @@ USBD_Status  USBD_StdEPReq (USB_OTG_CORE_HANDLE  *pdev, USB_SETUP_REQ  *req)
     case USB_OTG_ADDRESSED:
       if ((ep_addr != 0x00) && (ep_addr != 0x80))
       {
-        dbg_printf(DBGMODE_ERR, "\r\n USBD_StdEPReq Stall, bad EP op before config is set, ep 0x%02X, dev_status 0x%02X, file " __FILE__ ":%d\r\n", ep_addr, pdev->dev.device_status, __LINE__);
+        dbg_printf(DBGMODE_ERR, "USBD_StdEPReq Stall, bad EP op before config is set, ep 0x%02X, dev_status 0x%02X, file " __FILE__ ":%d\r\n", ep_addr, pdev->dev.device_status, __LINE__);
         DCD_EP_Stall(pdev , ep_addr);
       }
       break;
@@ -352,7 +352,7 @@ USBD_Status  USBD_StdEPReq (USB_OTG_CORE_HANDLE  *pdev, USB_SETUP_REQ  *req)
       break;
 
     default:
-       dbg_printf(DBGMODE_DEBUG, "\r\n USBD_StdEPReq Stall, unknown bRequest 0x%02X, file " __FILE__ ":%d\r\n", req->bRequest, __LINE__);
+       dbg_printf(DBGMODE_DEBUG, "USBD_StdEPReq Stall, unknown bRequest 0x%02X, file " __FILE__ ":%d\r\n", req->bRequest, __LINE__);
        USBD_CtlError(pdev , req);
       break;
     }
@@ -433,7 +433,7 @@ static void USBD_GetDescriptor(USB_OTG_CORE_HANDLE  *pdev,
       pbuf = pdev->dev.cb->GetUsrStrDescriptor(pdev->cfg.speed, (req->wValue) , &len);
       break;
 #else
-       dbg_printf(DBGMODE_DEBUG, "\r\n USBD_GetDescriptor Stall, user string request unsupported, file " __FILE__ ":%d\r\n", __LINE__);
+       dbg_printf(DBGMODE_DEBUG, "USBD_GetDescriptor Stall, user string request unsupported, file " __FILE__ ":%d\r\n", __LINE__);
        USBD_CtlError(pdev , req);
       return;
 #endif /* USBD_CtlError(pdev , req); */
@@ -459,12 +459,12 @@ static void USBD_GetDescriptor(USB_OTG_CORE_HANDLE  *pdev,
     }
     //else
     {
-      //dbg_printf(DBGMODE_ERR, "\r\n USBD_GetDescriptor Stall, HS unsupported, file " __FILE__ ":%d\r\n", __LINE__);
+      //dbg_printf(DBGMODE_ERR, "USBD_GetDescriptor Stall, HS unsupported, file " __FILE__ ":%d\r\n", __LINE__);
       //USBD_CtlError(pdev , req);
       //return;
     }
 #else
-      dbg_printf(DBGMODE_ERR, "\r\n USBD_GetDescriptor Stall, HS unsupported, file " __FILE__ ":%d\r\n", __LINE__);
+      dbg_printf(DBGMODE_ERR, "USBD_GetDescriptor Stall, HS unsupported, file " __FILE__ ":%d\r\n", __LINE__);
       USBD_CtlError(pdev , req);
       return;
 #endif
@@ -480,19 +480,19 @@ static void USBD_GetDescriptor(USB_OTG_CORE_HANDLE  *pdev,
     }
     else
     {
-      dbg_printf(DBGMODE_ERR, "\r\n USBD_GetDescriptor Stall, HS unsupported, file " __FILE__ ":%d\r\n", __LINE__);
+      dbg_printf(DBGMODE_ERR, "USBD_GetDescriptor Stall, HS unsupported, file " __FILE__ ":%d\r\n", __LINE__);
       USBD_CtlError(pdev , req);
       return;
     }
 #else
-      dbg_printf(DBGMODE_ERR, "\r\n USBD_GetDescriptor Stall, HS unsupported, file " __FILE__ ":%d\r\n", __LINE__);
+      dbg_printf(DBGMODE_ERR, "USBD_GetDescriptor Stall, HS unsupported, file " __FILE__ ":%d\r\n", __LINE__);
       USBD_CtlError(pdev , req);
       return;
 #endif
 
 
   default:
-     dbg_printf(DBGMODE_ERR, "\r\n USBD_GetDescriptor Stall, unknown descriptor type 0x%04X, file " __FILE__ ":%d\r\n", req->wValue, __LINE__);
+     dbg_printf(DBGMODE_ERR, "USBD_GetDescriptor Stall, unknown descriptor type 0x%04X, file " __FILE__ ":%d\r\n", req->wValue, __LINE__);
      USBD_CtlError(pdev , req);
     return;
   }
@@ -526,7 +526,7 @@ static void USBD_SetAddress(USB_OTG_CORE_HANDLE  *pdev,
 
     if (pdev->dev.device_status == USB_OTG_CONFIGURED)
     {
-      dbg_printf(DBGMODE_ERR, "\r\n USBD_SetAddress error, already configured device, file " __FILE__ ":%d\r\n", __LINE__);
+      dbg_printf(DBGMODE_ERR, "USBD_SetAddress error, already configured device, file " __FILE__ ":%d\r\n", __LINE__);
       //USBD_CtlError(pdev , req);
     }
     //else
@@ -547,7 +547,7 @@ static void USBD_SetAddress(USB_OTG_CORE_HANDLE  *pdev,
   }
   else
   {
-     dbg_printf(DBGMODE_ERR, "\r\n USBD_SetAddress Stall, bad wIndex 0x%04X or wLength 0x%04X, file " __FILE__ ":%d\r\n", req->wIndex, req->wLength, __LINE__);
+     dbg_printf(DBGMODE_ERR, "USBD_SetAddress Stall, bad wIndex 0x%04X or wLength 0x%04X, file " __FILE__ ":%d\r\n", req->wIndex, req->wLength, __LINE__);
      USBD_CtlError(pdev , req);
   }
 }
@@ -569,7 +569,7 @@ static void USBD_SetConfig(USB_OTG_CORE_HANDLE  *pdev,
 
   if (cfgidx > USBD_CFG_MAX_NUM )
   {
-     dbg_printf(DBGMODE_ERR, "\r\n USBD_SetConfig Stall, bad cfgidx 0x%04X, file " __FILE__ ":%d\r\n", req->wValue, __LINE__);
+     dbg_printf(DBGMODE_ERR, "USBD_SetConfig Stall, bad cfgidx 0x%04X, file " __FILE__ ":%d\r\n", req->wValue, __LINE__);
      USBD_CtlError(pdev , req);
   }
   else
@@ -616,7 +616,7 @@ static void USBD_SetConfig(USB_OTG_CORE_HANDLE  *pdev,
       break;
 
     default:
-       dbg_printf(DBGMODE_ERR, "\r\n USBD_SetConfig Stall, unknown device_status 0x%02X, file " __FILE__ ":%d\r\n", pdev->dev.device_status, __LINE__);
+       dbg_printf(DBGMODE_ERR, "USBD_SetConfig Stall, unknown device_status 0x%02X, file " __FILE__ ":%d\r\n", pdev->dev.device_status, __LINE__);
        USBD_CtlError(pdev , req);
       break;
     }
@@ -636,7 +636,7 @@ static void USBD_GetConfig(USB_OTG_CORE_HANDLE  *pdev,
 
   if (req->wLength != 1)
   {
-     dbg_printf(DBGMODE_ERR, "\r\n USBD_GetConfig Stall, bad wLength 0x%04X (should be 1), file " __FILE__ ":%d\r\n", req->wLength, __LINE__);
+     dbg_printf(DBGMODE_ERR, "USBD_GetConfig Stall, bad wLength 0x%04X (should be 1), file " __FILE__ ":%d\r\n", req->wLength, __LINE__);
      USBD_CtlError(pdev , req);
   }
   else
@@ -658,7 +658,7 @@ static void USBD_GetConfig(USB_OTG_CORE_HANDLE  *pdev,
       break;
 
     default:
-       dbg_printf(DBGMODE_ERR, "\r\n USBD_GetConfig Stall, unknown device_status 0x%02X, file " __FILE__ ":%d\r\n", pdev->dev.device_status, __LINE__);
+       dbg_printf(DBGMODE_ERR, "USBD_GetConfig Stall, unknown device_status 0x%02X, file " __FILE__ ":%d\r\n", pdev->dev.device_status, __LINE__);
        USBD_CtlError(pdev , req);
       break;
     }
@@ -699,7 +699,7 @@ static void USBD_GetStatus(USB_OTG_CORE_HANDLE  *pdev,
     break;
 
   default :
-    dbg_printf(DBGMODE_ERR, "\r\n USBD_GetStatus Stall, unknown device_status 0x%02X, file " __FILE__ ":%d\r\n", pdev->dev.device_status, __LINE__);
+    dbg_printf(DBGMODE_ERR, "USBD_GetStatus Stall, unknown device_status 0x%02X, file " __FILE__ ":%d\r\n", pdev->dev.device_status, __LINE__);
     USBD_CtlError(pdev , req);
     break;
   }
@@ -786,7 +786,7 @@ static void USBD_ClrFeature(USB_OTG_CORE_HANDLE  *pdev,
     break;
 
   default :
-     dbg_printf(DBGMODE_ERR, "\r\n USBD_ClrFeature Stall, unknown device_status 0x%02X, file " __FILE__ ":%d\r\n", pdev->dev.device_status, __LINE__);
+     dbg_printf(DBGMODE_ERR, "USBD_ClrFeature Stall, unknown device_status 0x%02X, file " __FILE__ ":%d\r\n", pdev->dev.device_status, __LINE__);
      USBD_CtlError(pdev , req);
     break;
   }

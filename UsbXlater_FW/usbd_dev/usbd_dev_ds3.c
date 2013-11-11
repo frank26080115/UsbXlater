@@ -396,7 +396,7 @@ uint8_t USBD_Dev_DS3_ClassDeInit       (void *pcore , uint8_t cfgidx)
 	DCD_EP_Close (pcore , 0x83);
 	#endif
 
-	dbg_printf(DBGMODE_ERR, "\r\nUSBD_Dev_DS3_ClassDeInit\r\n");
+	dbg_printf(DBGMODE_ERR, "USBD_Dev_DS3_ClassDeInit\r\n");
 
 	return USBD_OK;
 }
@@ -443,7 +443,7 @@ uint8_t USBD_Dev_DS3_Setup             (void *pcore , USB_SETUP_REQ  *req)
 			// should never reach here
 			memset(USBD_Dev_DS3_bufTemp, 0, 0x40);
 			USBD_CtlSendData (pcore, (uint8_t *)USBD_Dev_DS3_bufTemp, req->wLength);
-			dbg_printf(DBGMODE_ERR, "\r\nrequest /w unknown wValue (0x%04X) from PS3\r\n", req->wValue);
+			dbg_printf(DBGMODE_ERR, "Request with unknown wValue (0x%04X) from PS3\r\n", req->wValue);
 		}
 		return USBD_OK;
 	}
@@ -507,7 +507,7 @@ uint8_t USBD_Dev_DS3_Setup             (void *pcore , USB_SETUP_REQ  *req)
 
 				default:
 					USBD_CtlError (pcore, req);
-					dbg_printf(DBGMODE_ERR, "\r\nDS3 Stall, unknown req 0x%02X, file " __FILE__ ":%d\r\n", req->bRequest, __LINE__);
+					dbg_printf(DBGMODE_ERR, "DS3 Stall, unknown req 0x%02X, file " __FILE__ ":%d\r\n", req->bRequest, __LINE__);
 					return USBD_FAIL;
 			}
 			#ifdef ENABLE_DS3_ADDITIONAL_FEATURES
@@ -546,7 +546,7 @@ uint8_t USBD_Dev_DS3_Setup             (void *pcore , USB_SETUP_REQ  *req)
 
 					default:
 						USBD_CtlError (pcore, req);
-						dbg_printf(DBGMODE_ERR, "\r\nDS3 Stall, unknown req 0x%02X, file " __FILE__ ":%d\r\n", req->bRequest, __LINE__);
+						dbg_printf(DBGMODE_ERR, "DS3 Stall, unknown req 0x%02X, file " __FILE__ ":%d\r\n", req->bRequest, __LINE__);
 						return USBD_FAIL;
 				}
 			}
@@ -646,11 +646,12 @@ uint8_t USBD_Dev_DS3_SendReport (USB_OTG_CORE_HANDLE *pcore,
                                 uint8_t *report,
                                 uint16_t len)
 {
-	static int repCnt;
+	static char repCnt;
 
 	if (pcore->dev.device_status == USB_OTG_CONFIGURED)
 	{
 		DCD_EP_Tx (pcore, USBD_Dev_DS3_D2H_EP, report, len);
+
 		if (repCnt > 50) {
 			led_1_tog();
 			repCnt = 0;
@@ -659,7 +660,7 @@ uint8_t USBD_Dev_DS3_SendReport (USB_OTG_CORE_HANDLE *pcore,
 	}
 	else
 	{
-		//dbg_printf(DBGMODE_ERR, "\r\n DS3_SendReport, device not ready yet, file " __FILE__ ":%d\r\n", __LINE__);
+		//dbg_printf(DBGMODE_ERR, "DS3_SendReport, device not ready yet, file " __FILE__ ":%d\r\n", __LINE__);
 	}
 	return USBD_OK;
 }

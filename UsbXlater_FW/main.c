@@ -43,6 +43,8 @@ int main(void)
 	cereal_init();
 	swo_init();
 
+	// this step determines the default output method of debug
+	// and it selects the active debug level
 	dbgmode = DBGMODE_SWO
 				| DBGMODE_ERR
 				| DBGMODE_TRACE
@@ -50,8 +52,8 @@ int main(void)
 				| DBGMODE_DEBUG
 				;
 
-	cereal_printf("hello world\r\n");
-	swo_printf("Compiled on " __DATE__ ", " __TIME__", ");
+	cereal_printf("\r\n\r\nhello world\r\n");
+	swo_printf("\r\n\r\nCompiled on " __DATE__ ", " __TIME__", ");
 	#ifdef __GNUC__
 	swo_printf("GNU C %d", __GNUC__);
 	#ifdef __GNUC_MINOR__
@@ -129,7 +131,7 @@ int main(void)
 
 		if (dev_intf_state == DISTATE_CONNECTED && USBD_Host_Is_PS3 != 0) {
 			// TODO: handle PS4 and Xbox
-			dbg_printf(DBGMODE_DEBUG, "\r\n Entering CTRLER Mode \r\n");
+			dbg_printf(DBGMODE_TRACE, "Entering CTRLER Mode \r\n");
 			dev_intf_state = DISTATE_CTRLER_PS3;
 		}
 
@@ -153,7 +155,7 @@ int main(void)
 			// force a reconnection to reenumerate as CDC
 			DCD_DevConnect(&USB_OTG_Core_dev);
 
-			dbg_printf(DBGMODE_TRACE, "\r\n Entering VCP Mode \r\n");
+			dbg_printf(DBGMODE_TRACE, "Entering VCP Mode \r\n");
 		}
 
 		uint8_t ret = cmdHandler();
@@ -189,7 +191,7 @@ int main(void)
 		if (host_intf_state == HISTATE_READY && dev_intf_state == DISTATE_CTRLER_PS3) {
 			// this is the main operating mode
 			// we go to a tighter loop for better performance
-			dbg_printf(DBGMODE_DEBUG, "\r\n Entering High Performance Loop \r\n");
+			dbg_printf(DBGMODE_TRACE, "Entering High Performance Controller Mode Loop \r\n");
 			break;
 		}
 	}
@@ -251,7 +253,7 @@ void run_passthrough()
 
 void run_bootload()
 {
-	dbg_printf(DBGMODE_TRACE, "\r\n Entering Bootloader Mode \r\n");
+	dbg_printf(DBGMODE_TRACE, "Entering Bootloader Mode \r\n");
 
 	// small delay for trace message
 	delay_1ms_cnt = 200;
@@ -260,6 +262,7 @@ void run_bootload()
 	jump_to_bootloader();
 }
 
+// return 0 to signal "nothing to handle", return a code if the caller should handle something
 uint8_t cmdHandler()
 {
 	static char cmdBuff[32];

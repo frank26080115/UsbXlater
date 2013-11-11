@@ -121,7 +121,7 @@ uint8_t USBH_Open_Channel  (USB_OTG_CORE_HANDLE *pcore,
   }
 
   /*
-  dbg_printf(DBGMODE_DEBUG, "\r\n USBH_Open_Channel, HC %d, ep# %d, is_in %d, dev_addr %d, \r\n",
+  dbg_printf(DBGMODE_DEBUG, "USBH_Open_Channel, HC %d, ep# %d, is_in %d, dev_addr %d, \r\n",
 		  hc_num,
 		  pcore->host.hc[hc_num].ep_num,
 		  pcore->host.hc[hc_num].ep_is_in,
@@ -185,7 +185,7 @@ uint8_t USBH_Alloc_Channel  (USB_OTG_CORE_HANDLE *pcore, uint8_t ep_addr)
 
   hc_num =  USBH_GetFreeChannel(pcore);
 
-  //dbg_printf(DBGMODE_DEBUG, "\r\n USBH_Alloc_Channel HC allocated: %d\r\n", hc_num);
+  //dbg_printf(DBGMODE_DEBUG, "USBH_Alloc_Channel HC allocated: %d\r\n", hc_num);
 
   if (hc_num >= 0)
   {
@@ -241,7 +241,7 @@ static int16_t USBH_GetFreeChannel (USB_OTG_CORE_HANDLE *pcore)
   {
 	if ((pcore->host.channel[idx] & HC_USED) == 0)
 	{
-	   //dbg_printf(DBGMODE_DEBUG, "\r\n USBH_GetFreeChannel HC allocated: %d\r\n", idx);
+	   //dbg_printf(DBGMODE_DEBUG, "USBH_GetFreeChannel HC allocated: %d\r\n", idx);
 	   return idx;
 	}
   }

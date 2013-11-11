@@ -109,19 +109,19 @@ void USBH_Dev_DefaultCB_DeviceDescAvailable(USB_OTG_CORE_HANDLE *pcore , USBH_DE
 		case 0x03:
 			// HID
 			pdev->cb = &USBH_Dev_HID_CB;
-			dbg_printf(DBGMODE_TRACE, "\r\n USBH_Dev_DefaultCB_DeviceDescAvailable Found Possible HID 0x%02X\r\n", pdev->device_prop.Dev_Desc.bDeviceClass);
+			dbg_printf(DBGMODE_TRACE, "USBH_Dev_DefaultCB_DeviceDescAvailable Found Possible HID 0x%02X\r\n", pdev->device_prop.Dev_Desc.bDeviceClass);
 			break;
 		case 0x09:
 			// hub
 			pdev->cb = &USBH_Dev_Hub_CB;
-			dbg_printf(DBGMODE_TRACE, "\r\n USBH_Dev_DefaultCB_DeviceDescAvailable Found Hub 0x%02X\r\n", pdev->device_prop.Dev_Desc.bDeviceClass);
+			dbg_printf(DBGMODE_TRACE, "USBH_Dev_DefaultCB_DeviceDescAvailable Found Hub 0x%02X\r\n", pdev->device_prop.Dev_Desc.bDeviceClass);
 			break;
 		case 0x08:
 			// mass storage
 			// fall through
 		default:
 			// unknown
-			dbg_printf(DBGMODE_ERR, "\r\n USBH_Dev_DefaultCB_DeviceDescAvailable unknown bDeviceClass 0x%02X\r\n", pdev->device_prop.Dev_Desc.bDeviceClass);
+			dbg_printf(DBGMODE_ERR, "USBH_Dev_DefaultCB_DeviceDescAvailable unknown bDeviceClass 0x%02X\r\n", pdev->device_prop.Dev_Desc.bDeviceClass);
 		;
 	}
 }
@@ -138,17 +138,17 @@ void USBH_Dev_DefaultCB_ConfigurationDescAvailable(USB_OTG_CORE_HANDLE *pcore , 
 
 void USBH_Dev_DefaultCB_ManufacturerString(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev, void * data_)
 {
-	dbg_printf(DBGMODE_DEBUG, "\r\nUSBH_Dev_DefaultCB_ManufacturerString: %s\r\n", data_);
+	dbg_printf(DBGMODE_DEBUG, "USBH_Dev_DefaultCB_ManufacturerString: %s\r\n", data_);
 }
 
 void USBH_Dev_DefaultCB_ProductString(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev, void * data_)
 {
-	dbg_printf(DBGMODE_DEBUG, "\r\nUSBH_Dev_DefaultCB_ProductString: %s\r\n", data_);
+	dbg_printf(DBGMODE_DEBUG, "USBH_Dev_DefaultCB_ProductString: %s\r\n", data_);
 }
 
 void USBH_Dev_DefaultCB_SerialNumString(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev, void * data_)
 {
-	dbg_printf(DBGMODE_DEBUG, "\r\nUSBH_Dev_DefaultCB_SerialNumString: %s\r\n", data_);
+	dbg_printf(DBGMODE_DEBUG, "USBH_Dev_DefaultCB_SerialNumString: %s\r\n", data_);
 }
 
 void USBH_Dev_DefaultCB_EnumerationDone(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)

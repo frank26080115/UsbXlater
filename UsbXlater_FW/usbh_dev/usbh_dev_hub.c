@@ -109,12 +109,12 @@ void USBH_Dev_Hub_Handle_InterruptIn(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev
 			errCode = USBH_Dev_Hub_GetPortStatus(pcore, pdev, pn, &wPortStatus, &wPortChange);
 
 			if (errCode != USBH_OK) {
-				dbg_printf(DBGMODE_ERR, "\r\n USBH_Dev_Hub_Handle_InterruptIn GetPortStatus (pn %d) failed (status 0x%04X) \r\n", pn, errCode);
+				dbg_printf(DBGMODE_ERR, "USBH_Dev_Hub_Handle_InterruptIn GetPortStatus (pn %d) failed (status 0x%04X) \r\n", pn, errCode);
 				USBH_ErrorHandle(pcore, pdev, errCode);
 				continue;
 			}
 
-			dbg_printf(DBGMODE_DEBUG, "\r\n Hub_Handle_InterruptIn Hub_GetPortStatus, pn: %d, s: 0x%04X, c: 0x%04X\r\n", pnp1, wPortStatus, wPortChange);
+			dbg_printf(DBGMODE_DEBUG, "Hub_Handle_InterruptIn Hub_GetPortStatus, pn: %d, s: 0x%04X, c: 0x%04X\r\n", pnp1, wPortStatus, wPortChange);
 
 			if ((wPortStatus & (1 << HUBWPORTSTATUS_POWER_BIT)) == 0) {
 				errCode = USBH_Dev_Hub_SetPortFeature(pcore, pdev, pn, HUBREQ_PORT_POWER);
@@ -150,7 +150,7 @@ void USBH_Dev_Hub_Handle_InterruptIn(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev
 				     Hub_Data->children[pn] != 0 &&
 				     Hub_Data->children[pn]->gState != HOST_IDLE && Hub_Data->children[pn]->gState != HOST_DEV_RESET_PENDING)
 				{
-					dbg_printf(DBGMODE_TRACE, "\r\n Hub disconnected device (pn %d)\r\n", pn);
+					dbg_printf(DBGMODE_TRACE, "Hub disconnected device (pn %d)\r\n", pn);
 
 					((USBH_Device_cb_TypeDef*)Hub_Data->children[pn]->cb)->DeviceDisconnected(pcore, pdev);
 					USBH_DeInit(pcore, Hub_Data->children[pn]); // frees channels
@@ -174,7 +174,8 @@ void USBH_Dev_Hub_Handle_InterruptIn(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev
 						Hub_Data->children[pn]->device_prop.address = 0; // new attached devices to a hub is always address 0
 						Hub_Data->port_busy = pnp1;
 						// we are allowed to pass this on to the upper state machine now, it will seem like it was attached normally
-						dbg_printf(DBGMODE_TRACE, "\r\n Hub passed new device (pn %d) to upper state machine \r\n", pn);
+						dbg_printf(DBGMODE_TRACE, "Hub passed new device (pn %d) to upper state machine \r\n", pn);
+						vcp_printf("Hub V%04XP%04XA%d New Device on Port %d\r\n", pdev->device_prop.Dev_Desc.idVendor, pdev->device_prop.Dev_Desc.idProduct, pdev->device_prop.address, pn);
 					}
 					else if (Hub_Data->children[pn] == 0)
 					{
@@ -192,7 +193,7 @@ void USBH_Dev_Hub_Handle_InterruptIn(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev
 						Hub_Data->children[pn]->Control.ep0size = USB_OTG_MAX_EP0_SIZE;
 						Hub_Data->children[pn]->cb = (void*)&USBH_Dev_CB_Default;
 						Hub_Data->port_busy = pnp1;
-						dbg_printf(DBGMODE_TRACE, "\r\n Hub created new child (pn %d) \r\n", pn);
+						dbg_printf(DBGMODE_TRACE, "Hub created new child (pn %d) \r\n", pn);
 					}
 				}
 			}
@@ -324,7 +325,7 @@ USBH_Status USBH_Dev_Hub_Task(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 	#ifdef HUB_ENABLE_DYNAMIC_HC_ALLOC
     }
     else {
-      dbg_printf(DBGMODE_ERR, "\r\n Unable to allocate channel for hub (addr %d) \r\n", pdev->device_prop.address);
+      dbg_printf(DBGMODE_ERR, "Unable to allocate channel for hub (addr %d) \r\n", pdev->device_prop.address);
       Hub_Data->hc_num_in = 0;
     }
     #endif
@@ -367,7 +368,7 @@ USBH_Status USBH_Dev_Hub_Task(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
     break;
 
   default:
-    dbg_printf(DBGMODE_ERR, "\r\n Hub_Task unknown Hub_Data->state 0x%02X \r\n", Hub_Data->state);
+    dbg_printf(DBGMODE_ERR, "Hub_Task unknown Hub_Data->state 0x%02X \r\n", Hub_Data->state);
     break;
   }
 
@@ -383,27 +384,27 @@ USBH_Status USBH_Dev_Hub_Task(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 
 void USBH_Dev_Hub_Init(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 {
-	dbg_printf(DBGMODE_TRACE, "\r\n USBH_Dev_Hub_Init \r\n");
+	dbg_printf(DBGMODE_TRACE, "USBH_Dev_Hub_Init \r\n");
 }
 
 void USBH_Dev_Hub_DeInit(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 {
-	dbg_printf(DBGMODE_TRACE, "\r\n USBH_Dev_Hub_DeInit \r\n");
+	dbg_printf(DBGMODE_TRACE, "USBH_Dev_Hub_DeInit \r\n");
 }
 
 void USBH_Dev_Hub_DeviceAttached(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 {
-	dbg_printf(DBGMODE_TRACE, "\r\n USBH_Dev_Hub_DeviceAttached \r\n");
+	dbg_printf(DBGMODE_TRACE, "USBH_Dev_Hub_DeviceAttached \r\n");
 }
 
 void USBH_Dev_Hub_ResetDevice(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 {
-	dbg_printf(DBGMODE_TRACE, "\r\n USBH_Dev_Hub_ResetDevice \r\n");
+	dbg_printf(DBGMODE_TRACE, "USBH_Dev_Hub_ResetDevice \r\n");
 }
 
 void USBH_Dev_Hub_DeviceDisconnected(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 {
-	dbg_printf(DBGMODE_TRACE, "\r\n USBH_Dev_Hub_DeviceDisconnected \r\n");
+	dbg_printf(DBGMODE_TRACE, "USBH_Dev_Hub_DeviceDisconnected \r\n");
 
 	Hub_Data_t* Hub_Data = pdev->Usr_Data;
 	// iterate all the ports
@@ -423,33 +424,33 @@ void USBH_Dev_Hub_DeviceDisconnected(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev
 
 void USBH_Dev_Hub_OverCurrentDetected(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 {
-	dbg_printf(DBGMODE_ERR, "\r\n USBH_Dev_Hub_OverCurrentDetected \r\n");
+	dbg_printf(DBGMODE_ERR, "USBH_Dev_Hub_OverCurrentDetected \r\n");
 }
 
 void USBH_Dev_Hub_DeviceSpeedDetected(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev, uint8_t DeviceSpeed)
 {
-	dbg_printf(DBGMODE_DEBUG, "\r\nUSBH_Dev_Hub_DeviceSpeedDetected: %d\r\n", DeviceSpeed);
+	dbg_printf(DBGMODE_DEBUG, "USBH_Dev_Hub_DeviceSpeedDetected: %d\r\n", DeviceSpeed);
 }
 
 void USBH_Dev_Hub_DeviceDescAvailable(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev, void* data_)
 {
-	dbg_printf(DBGMODE_TRACE, "\r\n Hub_DeviceDescAvailable (should not be called) \r\n");
+	dbg_printf(DBGMODE_TRACE, "Hub_DeviceDescAvailable (should not be called) \r\n");
 	// should not be callled
 }
 
 void USBH_Dev_Hub_DeviceAddressAssigned(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 {
-	dbg_printf(DBGMODE_TRACE, "\r\n Hub_DeviceAddressAssigned \r\n");
+	dbg_printf(DBGMODE_TRACE, "Hub_DeviceAddressAssigned \r\n");
 }
 
 void USBH_Dev_Hub_ConfigurationDescAvailable(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev, USBH_CfgDesc_TypeDef * cfg, USBH_InterfaceDesc_TypeDef * intf, USBH_EpDesc_TypeDef ** ep)
 {
-	dbg_printf(DBGMODE_TRACE, "\r\n Hub_ConfigurationDescAvailable \r\n");
+	dbg_printf(DBGMODE_TRACE, "Hub_ConfigurationDescAvailable \r\n");
 }
 
 void USBH_Dev_Hub_EnumerationDone(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 {
-	dbg_printf(DBGMODE_TRACE, "\r\n Hub_EnumerationDone \r\n");
+	dbg_printf(DBGMODE_TRACE, "Hub_EnumerationDone \r\n");
 
 	if (pdev->Usr_Data != 0) {
 		free(pdev->Usr_Data);
@@ -504,15 +505,16 @@ void USBH_Dev_Hub_EnumerationDone(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 								200);
 
 	if (status != USBH_OK) {
-		dbg_printf(DBGMODE_ERR, "\r\n Hub_EnumerationDone GetDescriptor failed, status 0x%02X \r\n", status);
+		dbg_printf(DBGMODE_ERR, "Hub_EnumerationDone GetDescriptor failed, status 0x%02X \r\n", status);
 		USBH_ErrorHandle(pcore, pdev, status);
 		return;
 	}
 
 	Hub_Data->num_ports = pcore->host.Rx_Buffer[2];
 
-	dbg_printf(DBGMODE_DEBUG, "\r\nbDescriptorType = 0x%02X\r\n", pcore->host.Rx_Buffer[1]);
-	dbg_printf(DBGMODE_DEBUG, "num_ports = %d\r\n", Hub_Data->num_ports);
+	dbg_printf(DBGMODE_DEBUG, "\rbDescriptorType = 0x%02X\r\n", pcore->host.Rx_Buffer[1]);
+	dbg_printf(DBGMODE_DEBUG, "\rnum_ports = %d\r\n", Hub_Data->num_ports);
+	vcp_printf("Hub V%04XP%04XA%d Enumerated, %d ports\r\n", pdev->device_prop.Dev_Desc.idVendor, pdev->device_prop.Dev_Desc.idProduct, pdev->device_prop.address, Hub_Data->num_ports);
 
 	// allocate memory for the children devices
 	if (Hub_Data->children != 0) {
@@ -530,14 +532,14 @@ void USBH_Dev_Hub_EnumerationDone(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 
 		status = USBH_Dev_Hub_GetPortStatus(pcore, pdev, pn, &wps, &wpc);
 		if (status != USBH_OK) {
-			dbg_printf(DBGMODE_ERR, "\r\n Hub_EnumerationDone GetPortStatus (pn %d) failed, status 0x%02X \r\n", pn, status);
+			dbg_printf(DBGMODE_ERR, "Hub_EnumerationDone GetPortStatus (pn %d) failed, status 0x%02X \r\n", pn, status);
 			USBH_ErrorHandle(pcore, pdev, status);
 			continue;
 		}
 
 		status = USBH_Dev_Hub_SetPortFeature(pcore, pdev, pn, HUBREQ_PORT_POWER);
 		if (status != USBH_OK) {
-			dbg_printf(DBGMODE_ERR, "\r\n Hub_EnumerationDone SetPortFeature (pn %d) failed, status 0x%02X \r\n", pn, status);
+			dbg_printf(DBGMODE_ERR, "Hub_EnumerationDone SetPortFeature (pn %d) failed, status 0x%02X \r\n", pn, status);
 			USBH_ErrorHandle(pcore, pdev, status);
 			continue;
 		}
@@ -555,7 +557,7 @@ void USBH_Dev_Hub_EnumerationDone(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 
 			status = USBH_Dev_Hub_GetPortStatus(pcore, pdev, pn, &wps, &wpc);
 			if (status != USBH_OK) {
-				dbg_printf(DBGMODE_ERR, "\r\n Hub_EnumerationDone GetPortStatus (pn %d) failed, status 0x%02X \r\n", pn, status);
+				dbg_printf(DBGMODE_ERR, "Hub_EnumerationDone GetPortStatus (pn %d) failed, status 0x%02X \r\n", pn, status);
 				USBH_ErrorHandle(pcore, pdev, status);
 				continue;
 			}
@@ -568,23 +570,23 @@ void USBH_Dev_Hub_EnumerationDone(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 	while (pwrRdy == 0 && pwrTries--);
 
 	if (pwrRdy != 0) {
-		dbg_printf(DBGMODE_TRACE, "\r\n Hub_EnumerationDone all port power ready \r\n");
+		dbg_printf(DBGMODE_TRACE, "Hub_EnumerationDone all port power ready \r\n");
 	}
 	else {
-		dbg_printf(DBGMODE_ERR, "\r\n Hub_EnumerationDone error, power not ready \r\n");
+		dbg_printf(DBGMODE_ERR, "Hub_EnumerationDone error, power not ready \r\n");
 	}
 
-	vcp_printf("\r\n V%04XP%04XA%d:Hub Ready, Ports: %d \r\n", pdev->device_prop.Dev_Desc.idVendor, pdev->device_prop.Dev_Desc.idProduct, pdev->device_prop.address, Hub_Data->num_ports);
+	vcp_printf("V%04XP%04XA%d:Hub Ready, Ports: %d \r\n", pdev->device_prop.Dev_Desc.idVendor, pdev->device_prop.Dev_Desc.idProduct, pdev->device_prop.address, Hub_Data->num_ports);
 }
 
 void USBH_Dev_Hub_DeviceNotSupported(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 {
-	dbg_printf(DBGMODE_ERR, "\r\n USBH_Dev_Hub_DeviceNotSupported \r\n");
+	dbg_printf(DBGMODE_ERR, "USBH_Dev_Hub_DeviceNotSupported \r\n");
 }
 
 void USBH_Dev_Hub_UnrecoveredError(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 {
-	dbg_printf(DBGMODE_ERR, "\r\n USBH_Dev_Hub_UnrecoveredError \r\n");
+	dbg_printf(DBGMODE_ERR, "USBH_Dev_Hub_UnrecoveredError \r\n");
 }
 
 USBH_Status USBH_Dev_Hub_SetPortFeature(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev, uint8_t port, uint16_t feature)

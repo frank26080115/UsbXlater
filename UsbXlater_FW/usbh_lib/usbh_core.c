@@ -245,7 +245,7 @@ void USBH_Process(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 		{
 			rootDisconnectedCnt++;
 			if (rootDisconnectedCnt > 5) {
-				dbg_printf(DBGMODE_DEBUG, "\r\n Root device disconnected! \r\n");
+				dbg_printf(DBGMODE_DEBUG, "Root device disconnected! \r\n");
 				HCD_ResetPort(pcore);
 				pdev->gState = HOST_DEV_DISCONNECTED;
 			}
@@ -273,7 +273,7 @@ void USBH_Process(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 			}
 			else if ((HCD_GetCurrentFrame(pcore) - USBH_Dev_Reset_Timer) > 100) {
 				pdev->gState = HOST_DEV_ATTACHED;
-				dbg_printf(DBGMODE_TRACE, "\r\n USBH new device attached HOST_DEV_ATTACHED \r\n");
+				dbg_printf(DBGMODE_TRACE, "USBH new device attached HOST_DEV_ATTACHED \r\n");
 			}
 		}
 		else
@@ -331,7 +331,7 @@ void USBH_Process(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 			}
 			else {
 				pdev->gState = HOST_DEV_ATTACHED; // retry
-				dbg_printf(DBGMODE_ERR, "\r\n Unable to open control EP \r\n");
+				dbg_printf(DBGMODE_ERR, "Unable to open control EP \r\n");
 				break;
 			}
 
@@ -359,7 +359,7 @@ void USBH_Process(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 
 			pdev->gState = HOST_DO_TASK;
 
-			dbg_printf(DBGMODE_TRACE, "\r\n Dev %d now entering DO_TASK \r\n", pdev->device_prop.address);
+			dbg_printf(DBGMODE_TRACE, "Dev %d now entering DO_TASK \r\n", pdev->device_prop.address);
 		}
 		break;
 
@@ -515,7 +515,7 @@ static USBH_Status USBH_HandleEnum(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
       if (possibleAddr > 0) {
         pdev->EnumState = ENUM_SET_ADDR;
         pdev->device_prop.address = possibleAddr;
-        vcp_printf("\r\n V%04XP%04XA%d:C%d:DevDesc:\r\n", pdev->device_prop.Dev_Desc.idVendor, pdev->device_prop.Dev_Desc.idProduct, pdev->device_prop.address, USB_DEVICE_DESC_SIZE);
+        vcp_printf("V%04XP%04XA%d:C%d:DevDesc:\r\n", pdev->device_prop.Dev_Desc.idVendor, pdev->device_prop.Dev_Desc.idProduct, pdev->device_prop.address, USB_DEVICE_DESC_SIZE);
         for (int k = 0; k < USB_DEVICE_DESC_SIZE; k++) {
           vcp_printf(" 0x%02X", pcore->host.Rx_Buffer[k]);
         }
@@ -577,7 +577,7 @@ static USBH_Status USBH_HandleEnum(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
                                                                                     pdev->device_prop.Itf_Desc,
                                                                                     pdev->device_prop.Ep_Desc[0]);
 
-      vcp_printf("\r\n V%04XP%04XA%d:C%d:ConfigDesc:\r\n", pdev->device_prop.Dev_Desc.idVendor, pdev->device_prop.Dev_Desc.idProduct, pdev->device_prop.address, pdev->device_prop.Cfg_Desc.wTotalLength);
+      vcp_printf("V%04XP%04XA%d:C%d:ConfigDesc:\r\n", pdev->device_prop.Dev_Desc.idVendor, pdev->device_prop.Dev_Desc.idProduct, pdev->device_prop.address, pdev->device_prop.Cfg_Desc.wTotalLength);
 		for (int k = 0; k < pdev->device_prop.Cfg_Desc.wTotalLength; k++) {
 			vcp_printf(" 0x%02X", pcore->host.Rx_Buffer[k]);
 		}
@@ -666,7 +666,7 @@ static USBH_Status USBH_HandleEnum(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
   case ENUM_DEV_CONFIGURED:
     /* user callback for enumeration done */
     Status = USBH_OK;
-    dbg_printf(DBGMODE_TRACE, "\r\n ENUM_DEV_CONFIGURED Succeeded\r\n");
+    dbg_printf(DBGMODE_TRACE, "ENUM_DEV_CONFIGURED Succeeded\r\n");
     break;
 
   default:
@@ -748,18 +748,18 @@ USBH_Status USBH_HandleControl (USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
     }
     else if(URB_Status == URB_ERROR)
     {
-      dbg_printf(DBGMODE_ERR, "\r\n USBH_HandleControl CTRL_SETUP_WAIT URB_Status == URB_ERROR \r\n");
+      dbg_printf(DBGMODE_ERR, "USBH_HandleControl CTRL_SETUP_WAIT URB_Status == URB_ERROR \r\n");
       pdev->Control.state = CTRL_ERROR;
       pdev->Control.status = CTRL_XACTERR;
     }
     else if (URB_Status == URB_IDLE && (HCD_GetCurrentFrame(pcore) - pdev->Control.timer) > pdev->Control.timeout)
     {
-      dbg_printf(DBGMODE_ERR, "\r\n USBH_HandleControl CTRL_SETUP_WAIT Timeout \r\n");
+      dbg_printf(DBGMODE_ERR, "USBH_HandleControl CTRL_SETUP_WAIT Timeout \r\n");
       pdev->Control.state = CTRL_SETUP; // retry
     }
     else if (URB_Status == URB_IDLE)
     {
-      //dbg_printf(DBGMODE_TRACE, "\r\n URB_Status == URB_IDLE, %d \r\n", (HCD_GetCurrentFrame(pcore) - pdev->Control.timer));
+      //dbg_printf(DBGMODE_TRACE, "URB_Status == URB_IDLE, %d \r\n", (HCD_GetCurrentFrame(pcore) - pdev->Control.timer));
     }
     break;
 
@@ -787,20 +787,20 @@ USBH_Status USBH_HandleControl (USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
     if  (URB_Status == URB_STALL)
     {
       pdev->gState =   pdev->gStateBkp; // In stall case, return to previous machine state
-      dbg_printf(DBGMODE_ERR, "\r\n USBH_HandleControl CTRL_DATA_IN_WAIT URB_Status == URB_STALL \r\n");
+      dbg_printf(DBGMODE_ERR, "USBH_HandleControl CTRL_DATA_IN_WAIT URB_Status == URB_STALL \r\n");
       return USBH_STALL;
     }
     else if (URB_Status == URB_ERROR)
     {
       /* Device error */
       pdev->Control.state = CTRL_ERROR;
-      dbg_printf(DBGMODE_ERR, "\r\n USBH_HandleControl CTRL_DATA_IN_WAIT URB_Status == URB_ERROR \r\n");
+      dbg_printf(DBGMODE_ERR, "USBH_HandleControl CTRL_DATA_IN_WAIT URB_Status == URB_ERROR \r\n");
     }
     else if ((HCD_GetCurrentFrame(pcore)- pdev->Control.timer) > pdev->Control.timeout)
     {
       /* timeout for IN transfer */
       pdev->Control.state = CTRL_ERROR;
-      dbg_printf(DBGMODE_ERR, "\r\n USBH_HandleControl CTRL_DATA_IN_WAIT Timeout \r\n");
+      dbg_printf(DBGMODE_ERR, "USBH_HandleControl CTRL_DATA_IN_WAIT Timeout \r\n");
     }
     break;
 
@@ -834,20 +834,20 @@ USBH_Status USBH_HandleControl (USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
       /* In stall case, return to previous machine state*/
       pdev->gState =   pdev->gStateBkp;
       pdev->Control.state = CTRL_STALLED;
-      dbg_printf(DBGMODE_ERR, "\r\n USBH_HandleControl CTRL_DATA_OUT_WAIT URB_Status == URB_STALL \r\n");
+      dbg_printf(DBGMODE_ERR, "USBH_HandleControl CTRL_DATA_OUT_WAIT URB_Status == URB_STALL \r\n");
       return USBH_STALL;
     }
     else if  (URB_Status == URB_NOTREADY)
     {
       /* Nack received from device */
       pdev->Control.state = CTRL_DATA_OUT;
-      dbg_printf(DBGMODE_DEBUG, "\r\n USBH_HandleControl CTRL_DATA_OUT_WAIT URB_Status == URB_NOTREADY \r\n");
+      dbg_printf(DBGMODE_DEBUG, "USBH_HandleControl CTRL_DATA_OUT_WAIT URB_Status == URB_NOTREADY \r\n");
     }
     else if (URB_Status == URB_ERROR)
     {
       /* device error */
       pdev->Control.state = CTRL_ERROR;
-      dbg_printf(DBGMODE_ERR, "\r\n USBH_HandleControl CTRL_DATA_OUT_WAIT URB_Status == URB_ERROR \r\n");
+      dbg_printf(DBGMODE_ERR, "USBH_HandleControl CTRL_DATA_OUT_WAIT URB_Status == URB_ERROR \r\n");
     }
     break;
 
@@ -877,13 +877,13 @@ USBH_Status USBH_HandleControl (USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
     else if (URB_Status == URB_ERROR)
     {
       pdev->Control.state = CTRL_ERROR;
-      dbg_printf(DBGMODE_ERR, "\r\n USBH_HandleControl CTRL_STATUS_IN_WAIT URB_Status == URB_ERROR \r\n");
+      dbg_printf(DBGMODE_ERR, "USBH_HandleControl CTRL_STATUS_IN_WAIT URB_Status == URB_ERROR \r\n");
     }
 
     else if((HCD_GetCurrentFrame(pcore) - pdev->Control.timer) > pdev->Control.timeout)
     {
       pdev->Control.state = CTRL_ERROR;
-      dbg_printf(DBGMODE_ERR, "\r\n USBH_HandleControl CTRL_STATUS_IN_WAIT Timeout \r\n");
+      dbg_printf(DBGMODE_ERR, "USBH_HandleControl CTRL_STATUS_IN_WAIT Timeout \r\n");
     }
      else if(URB_Status == URB_STALL)
     {
@@ -891,7 +891,7 @@ USBH_Status USBH_HandleControl (USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
       pdev->gState =   pdev->gStateBkp;
       pdev->Control.status = CTRL_STALL;
       status = USBH_NOT_SUPPORTED;
-      dbg_printf(DBGMODE_ERR, "\r\n USBH_HandleControl CTRL_STATUS_IN_WAIT URB_Status == URB_STALL \r\n");
+      dbg_printf(DBGMODE_ERR, "USBH_HandleControl CTRL_STATUS_IN_WAIT URB_Status == URB_STALL \r\n");
     }
     break;
 
@@ -917,12 +917,12 @@ USBH_Status USBH_HandleControl (USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
     else if  (URB_Status == URB_NOTREADY)
     {
       pdev->Control.state = CTRL_STATUS_OUT;
-      dbg_printf(DBGMODE_ERR, "\r\n USBH_HandleControl CTRL_STATUS_OUT_WAIT URB_Status == URB_NOTREADY \r\n");
+      dbg_printf(DBGMODE_ERR, "USBH_HandleControl CTRL_STATUS_OUT_WAIT URB_Status == URB_NOTREADY \r\n");
     }
     else if (URB_Status == URB_ERROR)
     {
       pdev->Control.state = CTRL_ERROR;
-      dbg_printf(DBGMODE_ERR, "\r\n USBH_HandleControl CTRL_STATUS_OUT_WAIT URB_Status == URB_ERROR \r\n");
+      dbg_printf(DBGMODE_ERR, "USBH_HandleControl CTRL_STATUS_OUT_WAIT URB_Status == URB_ERROR \r\n");
     }
     break;
 
@@ -946,7 +946,7 @@ USBH_Status USBH_HandleControl (USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
       pdev->gState =   pdev->gStateBkp;
 
       status = USBH_FAIL;
-      dbg_printf(DBGMODE_ERR, "\r\n USBH_HandleControl CTRL_ERROR Reached USBH_MAX_ERROR_COUNT \r\n");
+      dbg_printf(DBGMODE_ERR, "USBH_HandleControl CTRL_ERROR Reached USBH_MAX_ERROR_COUNT \r\n");
     }
     break;
 

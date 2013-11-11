@@ -271,14 +271,14 @@ static uint8_t  USBD_CDC_Setup (void  *pdev, USB_SETUP_REQ *req)
 			else
 			{
 				USBD_CtlError (pdev, req);
-				dbg_printf(DBGMODE_ERR, "\r\n CDC Stall, USB_REQ_SET_INTERFACE, unknown wValue 0x%04X, file " __FILE__ ":%d\r\n", req->wValue, __LINE__);
+				dbg_printf(DBGMODE_ERR, "CDC Stall, USB_REQ_SET_INTERFACE, unknown wValue 0x%04X, file " __FILE__ ":%d\r\n", req->wValue, __LINE__);
 			}
 			break;
 		}
 
 		default:
 			USBD_CtlError (pdev, req);
-			dbg_printf(DBGMODE_ERR, "\r\n CDC Stall, unknown bmRequest 0x%02X, file " __FILE__ ":%d\r\n", req->bmRequest, __LINE__);
+			dbg_printf(DBGMODE_ERR, "CDC Stall, unknown bmRequest 0x%02X, file " __FILE__ ":%d\r\n", req->bmRequest, __LINE__);
 			return USBD_FAIL;
 	}
 	return USBD_OK;

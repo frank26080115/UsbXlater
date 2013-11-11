@@ -51,19 +51,19 @@ void kbm2c_handleKeyReport(uint8_t modifier, uint8_t* data, uint8_t len)
 
 		if (data[i] == KEYCODE_F11) {
 			kbm2c_testOffset += 10;
-			cereal_printf("\r\n kbm2c_testOffset %d \r\n", kbm2c_testOffset);
+			cereal_printf("kbm2c_testOffset %d \r\n", kbm2c_testOffset);
 		}
 		else if (data[i] == KEYCODE_F10) {
 			kbm2c_testOffset += 1;
-			cereal_printf("\r\n kbm2c_testOffset %d \r\n", kbm2c_testOffset);
+			cereal_printf("kbm2c_testOffset %d \r\n", kbm2c_testOffset);
 		}
 		else if (data[i] == KEYCODE_F9) {
 			kbm2c_testOffset -= 1;
-			cereal_printf("\r\n kbm2c_testOffset %d \r\n", kbm2c_testOffset);
+			cereal_printf("kbm2c_testOffset %d \r\n", kbm2c_testOffset);
 		}
 		else if (data[i] == KEYCODE_F8) {
 			kbm2c_testOffset -= 10;
-			cereal_printf("\r\n kbm2c_testOffset %d \r\n", kbm2c_testOffset);
+			cereal_printf("kbm2c_testOffset %d \r\n", kbm2c_testOffset);
 		}
 	}
 	kbm2c_keyFlags[KBM2C_KEYFLAGS_SIZE - 1] |= modifier;

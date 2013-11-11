@@ -44,6 +44,8 @@
 /* Private macro -------------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
 
+static volatile uint8_t fault_source;
+
 /* Private function prototypes -----------------------------------------------*/
 
 /* Private functions ---------------------------------------------------------*/
@@ -51,16 +53,6 @@
 /******************************************************************************/
 /*             Cortex-M Processor Exceptions Handlers                         */
 /******************************************************************************/
-/**
-  * @brief  NMI_Handler
-  *         This function handles NMI exception.
-  * @param  None
-  * @retval None
-  */
-void NMI_Handler(void)
-{
-	dbg_printf(DBGMODE_DEBUG, "\r\n NMI_Handler, file " __FILE__ ":%d\r\n", __LINE__);
-}
 
 /*
  * hardfault debugging assistant: http://www.freertos.org/Debugging-Hard-Faults-On-Cortex-M-Microcontrollers.html
@@ -87,14 +79,26 @@ void prvGetRegistersFromStack( uint32_t *pulFaultStackAddress )
 	r3 = pulFaultStackAddress[ 3 ];
 
 	r12 = pulFaultStackAddress[ 4 ];
-	lr = pulFaultStackAddress[ 5 ];
-	pc = pulFaultStackAddress[ 6 ];
+	lr  = pulFaultStackAddress[ 5 ];
+	pc  = pulFaultStackAddress[ 6 ];
 	psr = pulFaultStackAddress[ 7 ];
 
 	/* When the following line is hit, the variables contain the register values. */
-	dbg_printf(DBGMODE_ERR, "\r\n HardFault_Handler, r0: 0x%08X, r1: 0x%08X, r2: 0x%08X, r3: 0x%08X,", r0, r1, r2, r3);
-	dbg_printf(DBGMODE_ERR, " r12: 0x%08X, LR: 0x%08X, PC: 0x%08X, PSR: 0x%08X, \r\n", r12, lr, pc, psr);
+	dbg_printf(DBGMODE_ERR, "\r\n Exception Handler, source: %d\r\n", fault_source);
+	dbg_printf(DBGMODE_ERR, "r0: 0x%08X, r1: 0x%08X, r2: 0x%08X, r3: 0x%08X,", r0, r1, r2, r3);
+	dbg_printf(DBGMODE_ERR, " r12: 0x%08X\r\nLR: 0x%08X, PC: 0x%08X, PSR: 0x%08X, \r\n", r12, lr, pc, psr);
 	for( ;; ) { led_1_on(); led_2_on(); led_3_on(); led_4_on(); };
+}
+
+/**
+  * @brief  NMI_Handler
+  *         This function handles NMI exception.
+  * @param  None
+  * @retval None
+  */
+void NMI_Handler(void)
+{
+	dbg_printf(DBGMODE_DEBUG, "\r\n NMI_Handler, file " __FILE__ ":%d\r\n", __LINE__);
 }
 
 /**
@@ -105,6 +109,7 @@ void prvGetRegistersFromStack( uint32_t *pulFaultStackAddress )
   */
 void HardFault_Handler(void)
 {
+  fault_source = 1;
   __asm volatile
   (
         " tst lr, #4                                                \n"
@@ -117,10 +122,7 @@ void HardFault_Handler(void)
         " handler2_address_const: .word prvGetRegistersFromStack    \n"
   );
   /* Go to infinite loop when Hard Fault exception occurs */
-  while (1)
-  {
-	led_1_on(); led_2_on(); led_3_on(); led_4_on();
-  }
+  while (1) { led_1_on(); led_2_on(); led_3_on(); led_4_on(); }
 }
 
 /**
@@ -131,11 +133,19 @@ void HardFault_Handler(void)
   */
 void MemManage_Handler(void)
 {
-  dbg_printf(DBGMODE_ERR, "\r\n MemManage_Handler, file " __FILE__ ":%d\r\n", __LINE__);
-  /* Go to infinite loop when Memory Manage exception occurs */
-  while (1)
-  {
-  }
+  fault_source = 2;
+  __asm volatile
+  (
+        " tst lr, #4                                                \n"
+        " ite eq                                                    \n"
+        " mrseq r0, msp                                             \n"
+        " mrsne r0, psp                                             \n"
+        " ldr r1, [r0, #24]                                         \n"
+        " ldr r2, handler3_address_const                            \n"
+        " bx r2                                                     \n"
+        " handler3_address_const: .word prvGetRegistersFromStack    \n"
+  );
+  while (1) { led_1_on(); led_2_on(); led_3_on(); led_4_on(); }
 }
 
 /**
@@ -146,11 +156,19 @@ void MemManage_Handler(void)
   */
 void BusFault_Handler(void)
 {
-  dbg_printf(DBGMODE_ERR, "\r\n BusFault_Handler, file " __FILE__ ":%d\r\n", __LINE__);
-  /* Go to infinite loop when Bus Fault exception occurs */
-  while (1)
-  {
-  }
+  fault_source = 3;
+  __asm volatile
+  (
+        " tst lr, #4                                                \n"
+        " ite eq                                                    \n"
+        " mrseq r0, msp                                             \n"
+        " mrsne r0, psp                                             \n"
+        " ldr r1, [r0, #24]                                         \n"
+        " ldr r2, handler4_address_const                            \n"
+        " bx r2                                                     \n"
+        " handler4_address_const: .word prvGetRegistersFromStack    \n"
+  );
+  while (1) { led_1_on(); led_2_on(); led_3_on(); led_4_on(); }
 }
 
 /**
@@ -161,11 +179,19 @@ void BusFault_Handler(void)
   */
 void UsageFault_Handler(void)
 {
-  dbg_printf(DBGMODE_ERR, "\r\n UsageFault_Handler, file " __FILE__ ":%d\r\n", __LINE__);
-  /* Go to infinite loop when Usage Fault exception occurs */
-  while (1)
-  {
-  }
+  fault_source = 4;
+  __asm volatile
+  (
+        " tst lr, #4                                                \n"
+        " ite eq                                                    \n"
+        " mrseq r0, msp                                             \n"
+        " mrsne r0, psp                                             \n"
+        " ldr r1, [r0, #24]                                         \n"
+        " ldr r2, handler5_address_const                            \n"
+        " bx r2                                                     \n"
+        " handler5_address_const: .word prvGetRegistersFromStack    \n"
+  );
+  while (1) { led_1_on(); led_2_on(); led_3_on(); led_4_on(); }
 }
 
 /**

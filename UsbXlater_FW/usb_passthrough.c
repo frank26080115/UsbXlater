@@ -71,7 +71,7 @@ void USBPT_Work()
 	{
 		if (HCD_IsDeviceConnected(&USB_OTG_Core_host) != 0)
 		{
-			USBPT_printf("\r\n USBPT Device Connecting \r\n");
+			USBPT_printf("USBPT Device Connecting \r\n");
 
 			USBPT_Dev->Control.hc_num_out = USBH_Alloc_Channel(&USB_OTG_Core_host, 0x00);
 			USBPT_Dev->Control.hc_num_in  = USBH_Alloc_Channel(&USB_OTG_Core_host, 0x80);
@@ -95,7 +95,7 @@ void USBPT_Work()
 			}
 			else
 			{
-				dbg_printf(DBGMODE_ERR, "\r\n USBPT Unable to allocate control EP HC \r\n");
+				dbg_printf(DBGMODE_ERR, "USBPT Unable to allocate control EP HC \r\n");
 			}
 		}
 		else
@@ -107,7 +107,7 @@ void USBPT_Work()
 	{
 		if (HCD_IsDeviceConnected(&USB_OTG_Core_host) == 0)
 		{
-			USBPT_printf("\r\n USBPT Device Disconnecting \r\n");
+			USBPT_printf("USBPT Device Disconnecting \r\n");
 			USBD_DeInit(&USB_OTG_Core_dev);
 			DCD_DevDisconnect(&USB_OTG_Core_dev);
 			USBPT_Has_Dev = 0;
@@ -173,7 +173,7 @@ void USBPT_Work()
 					// data was indeed received
 
 					// print it to the serial port for monitoring
-					USBPT_printf("\r\n USBPT:IN:EP0x%02X:", epnum);
+					USBPT_printf("USBPT:IN:EP0x%02X:", epnum);
 					for (uint16_t c = 0; c < USBPT_GeneralInDataLen; c++) {
 						USBPT_printf(" 0x%02X", USBPT_GeneralInData[c]);
 					}
@@ -185,11 +185,11 @@ void USBPT_Work()
 					break;
 				}
 				else if (us == URB_ERROR) {
-					dbg_printf(DBGMODE_ERR, "\r\n DataIn Error on EP 0x%02X \r\n", epnum);
+					dbg_printf(DBGMODE_ERR, "DataIn Error on EP 0x%02X \r\n", epnum);
 					break;
 				}
 				else if (us == URB_STALL) {
-					dbg_printf(DBGMODE_ERR, "\r\n DataIn Stalled EP 0x%02X \r\n", epnum);
+					dbg_printf(DBGMODE_ERR, "DataIn Stalled EP 0x%02X \r\n", epnum);
 					break;
 				}
 				else if (us == URB_NOTREADY) {
@@ -200,7 +200,7 @@ void USBPT_Work()
 			while (delay_1ms_cnt > 0);
 
 			if (delay_1ms_cnt == 0) {
-				dbg_printf(DBGMODE_ERR, "\r\n DataIn Read Timed Out EP 0x%02X \r\n", epnum);
+				dbg_printf(DBGMODE_ERR, "DataIn Read Timed Out EP 0x%02X \r\n", epnum);
 			}
 		}
 	}
@@ -350,7 +350,7 @@ uint8_t USBPTD_SetupStage(USB_OTG_CORE_HANDLE* pcore, USB_SETUP_REQ* req)
 		if (delay_1ms_cnt == 0)
 		{
 			// timeout
-			dbg_printf(DBGMODE_ERR, "\r\n USBPT Setup Timed Out \r\n");
+			dbg_printf(DBGMODE_ERR, "USBPT Setup Timed Out \r\n");
 			USBD_CtlSendStatus(pcore); // we reply with nothing to simulate a timeout
 			return USBH_OK;
 		}
@@ -455,7 +455,7 @@ uint8_t USBPTD_SetupStage(USB_OTG_CORE_HANDLE* pcore, USB_SETUP_REQ* req)
 		else
 		{
 			if (status == USBH_STALL || status == USBH_NOT_SUPPORTED) {
-				dbg_printf(DBGMODE_ERR, "\r\n USBPT Setup Stalled \r\n");
+				dbg_printf(DBGMODE_ERR, "USBPT Setup Stalled \r\n");
 				USBD_CtlError(pcore , req);
 				return USBH_OK;
 			}
@@ -464,7 +464,7 @@ uint8_t USBPTD_SetupStage(USB_OTG_CORE_HANDLE* pcore, USB_SETUP_REQ* req)
 		return USBD_OK;
 	}
 
-	dbg_printf(DBGMODE_ERR, "\r\n USBPT Setup Unhandled Error \r\n");
+	dbg_printf(DBGMODE_ERR, "USBPT Setup Unhandled Error \r\n");
 	USBD_CtlError(pcore , req);
 
 	return USBD_OK;
@@ -592,7 +592,7 @@ uint8_t USBPTD_DataOut           (void *pcore , uint8_t epnum)
 	}
 
 	// print to monitor
-	USBPT_printf("\r\n USBPT:OUT:EP0x%02X:", epnum);
+	USBPT_printf("USBPT:OUT:EP0x%02X:", epnum);
 	for (uint16_t i = 0; i < wLength; i++) {
 		USBPT_printf(" 0x%02X", data[i]);
 	}
@@ -622,12 +622,12 @@ uint8_t USBPTD_DataOut           (void *pcore , uint8_t epnum)
 		while (delay_1ms_cnt > 0);
 
 		if (delay_1ms_cnt == 0) {
-			dbg_printf(DBGMODE_ERR, "\r\n USBPTD_DataOut timed out while sending to device, status: 0x%04X \r\n", status);
+			dbg_printf(DBGMODE_ERR, "USBPTD_DataOut timed out while sending to device, status: 0x%04X \r\n", status);
 			USBD_CtlError(pcore , 0);
 			return USBD_FAIL;
 		}
 		else if (status != USBH_OK) {
-			dbg_printf(DBGMODE_ERR, "\r\n USBPTD_DataOut failed to send to device, status: 0x%04X \r\n", status);
+			dbg_printf(DBGMODE_ERR, "USBPTD_DataOut failed to send to device, status: 0x%04X \r\n", status);
 			USBD_CtlError(pcore , 0);
 			return USBD_FAIL;
 		}
@@ -712,12 +712,12 @@ uint8_t USBPTD_DataOut           (void *pcore , uint8_t epnum)
 						break;
 					}
 					else if (us == URB_ERROR) {
-						dbg_printf(DBGMODE_ERR, "\r\n USBPTD_DataOut Send Error on EP 0x%02X \r\n", epnum);
+						dbg_printf(DBGMODE_ERR, "USBPTD_DataOut Send Error on EP 0x%02X \r\n", epnum);
 						DCD_EP_Stall(pcore, epnum);
 						break;
 					}
 					else if (us == URB_STALL) {
-						dbg_printf(DBGMODE_ERR, "\r\n USBPTD_DataOut Stalled EP 0x%02X \r\n", epnum);
+						dbg_printf(DBGMODE_ERR, "USBPTD_DataOut Stalled EP 0x%02X \r\n", epnum);
 						DCD_EP_Stall(pcore, epnum);
 						break;
 					}
@@ -725,7 +725,7 @@ uint8_t USBPTD_DataOut           (void *pcore , uint8_t epnum)
 				while (delay_1ms_cnt > 0);
 
 				if (delay_1ms_cnt == 0) {
-					dbg_printf(DBGMODE_ERR, "\r\n USBPTD_DataOut Send Timed Out EP 0x%02X \r\n", epnum);
+					dbg_printf(DBGMODE_ERR, "USBPTD_DataOut Send Timed Out EP 0x%02X \r\n", epnum);
 				}
 
 				// free the channel to be used by something else later
@@ -734,13 +734,13 @@ uint8_t USBPTD_DataOut           (void *pcore , uint8_t epnum)
 			}
 			else
 			{
-				dbg_printf(DBGMODE_ERR, "\r\n USBPTD_DataOut Failed to Alloc HC for EP 0x%02X \r\n", epnum);
+				dbg_printf(DBGMODE_ERR, "USBPTD_DataOut Failed to Alloc HC for EP 0x%02X \r\n", epnum);
 			}
 
 		}
 		else
 		{
-			dbg_printf(DBGMODE_ERR, "\r\n USBPTD_DataOut No Such EP 0x%02X \r\n", epnum);
+			dbg_printf(DBGMODE_ERR, "USBPTD_DataOut No Such EP 0x%02X \r\n", epnum);
 		}
 
 		return USBD_OK;
@@ -825,7 +825,7 @@ void USBPTD_UsrInit(void)
 
 void USBPTD_DeviceReset(uint8_t speed)
 {
-	USBPT_printf("\r\n USBPT Host Caused Reset \r\n");
+	USBPT_printf("USBPT Host Caused Reset \r\n");
 }
 
 void USBPTD_DeviceConfigured(void)
@@ -842,12 +842,12 @@ void USBPTD_DeviceResumed(void)
 
 void USBPTD_DeviceConnected(void)
 {
-	USBPT_printf("\r\n USBPT Host Connecting \r\n");
+	USBPT_printf("USBPT Host Connecting \r\n");
 }
 
 void USBPTD_DeviceDisconnected(void)
 {
-	USBPT_printf("\r\n USBPT Host Disconnecting \r\n");
+	USBPT_printf("USBPT Host Disconnecting \r\n");
 }
 
 

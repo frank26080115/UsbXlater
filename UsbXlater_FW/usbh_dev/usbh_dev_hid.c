@@ -114,7 +114,7 @@ USBH_Status USBH_Dev_HID_Task(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
 {
 	uint8_t numIntf = pdev->device_prop.Cfg_Desc.bNumInterfaces;
 	if (numIntf == 0) {
-		dbg_printf(DBGMODE_ERR, "\r\n HID_Task device with 0 interfaces! \r\n");
+		dbg_printf(DBGMODE_ERR, "Warning: HID_Task device with 0 interfaces! \r\n");
 	}
 	for (int i = 0; i < numIntf; i++) {
 		USBH_HID_Handle(pcore, pdev, i);
@@ -182,7 +182,7 @@ void USBH_Dev_HID_EnumerationDone(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
 	char isHid = 0;
 	pdev->Usr_Data = calloc(numIntf, sizeof(HID_Data_t));
 
-	dbg_printf(DBGMODE_DEBUG, "\r\nUSBH_Dev_HID_EnumerationDone, bNumInterfaces: %d\r\n", numIntf);
+	dbg_printf(DBGMODE_DEBUG, "USBH_Dev_HID_EnumerationDone, bNumInterfaces: %d\r\n", numIntf);
 
 	for (int i = 0; i < numIntf; i++)
 	{
@@ -233,11 +233,11 @@ void USBH_Dev_HID_EnumerationDone(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
 											EP_TYPE_INTR,
 											HID_Data->length);
 
-						dbg_printf(DBGMODE_DEBUG, "\r\nInter-In EP allocated, intf: %d, ep: 0x%02X, len: %d\r\n", i, epDesc->bEndpointAddress, epDesc->wMaxPacketSize);
+						dbg_printf(DBGMODE_DEBUG, "Inter-In EP allocated, intf: %d, ep: 0x%02X, len: %d\r\n", i, epDesc->bEndpointAddress, epDesc->wMaxPacketSize);
 					}
 					else
 					{
-						dbg_printf(DBGMODE_DEBUG, "\r\n Unable to allocate Inter-In EP, intf: %d, ep: 0x%02X \r\n", i, epDesc->bEndpointAddress);
+						dbg_printf(DBGMODE_DEBUG, "Unable to allocate Inter-In EP, intf: %d, ep: 0x%02X \r\n", i, epDesc->bEndpointAddress);
 					}
 					#endif
 				}
@@ -265,56 +265,56 @@ void USBH_Dev_HID_EnumerationDone(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
 		status = USBH_Get_HID_Descriptor (pcore, pdev, i);
 		if (status == USBH_OK) {
 			USBH_ParseHIDDesc(&(HID_Data->HID_Desc), pcore->host.Rx_Buffer);
-			vcp_printf("\r\n V%04XP%04XA%dI%d:C%d:HIDDesc:\r\n", pdev->device_prop.Dev_Desc.idVendor, pdev->device_prop.Dev_Desc.idProduct, pdev->device_prop.address, i, USB_HID_DESC_SIZE);
+			vcp_printf("V%04XP%04XA%dI%d:C%d:HIDDesc:\r\n", pdev->device_prop.Dev_Desc.idVendor, pdev->device_prop.Dev_Desc.idProduct, pdev->device_prop.address, i, USB_HID_DESC_SIZE);
 			for (uint8_t k = 0; k < USB_HID_DESC_SIZE; k++) {
 				vcp_printf(" 0x%02X", pcore->host.Rx_Buffer[k]);
 			}
 			vcp_printf("\r\n");
 		}
 		else {
-			dbg_printf(DBGMODE_ERR, "\r\nUSBH_Get_HID_Descriptor failed status: 0x%04X\r\n", status);
+			dbg_printf(DBGMODE_ERR, "USBH_Get_HID_Descriptor failed status: 0x%04X\r\n", status);
 			USBH_ErrorHandle(pcore, pdev, status);
 			continue;
 		}
 
 		status = USBH_Get_HID_ReportDescriptor(pcore , pdev, i, HID_Data->HID_Desc.wItemLength);
 		if (status == USBH_OK) {
-			dbg_printf(DBGMODE_DEBUG, "\r\nUSBH_Get_HID_ReportDescriptor OK: 0x%04X\r\n", status);
+			dbg_printf(DBGMODE_DEBUG, "USBH_Get_HID_ReportDescriptor OK: 0x%04X\r\n", status);
 
-			vcp_printf("\r\n V%04XP%04XA%dI%d:C%d:ReptDesc:", pdev->device_prop.Dev_Desc.idVendor, pdev->device_prop.Dev_Desc.idProduct, pdev->device_prop.address, i, HID_Data->HID_Desc.wItemLength);
+			vcp_printf("V%04XP%04XA%dI%d:C%d:ReptDesc:", pdev->device_prop.Dev_Desc.idVendor, pdev->device_prop.Dev_Desc.idProduct, pdev->device_prop.address, i, HID_Data->HID_Desc.wItemLength);
 			for (uint8_t k = 0; k < HID_Data->HID_Desc.wItemLength; k++) {
 				vcp_printf(" 0x%02X", pcore->host.Rx_Buffer[k]);
 			}
 			vcp_printf("\r\n");
 
 			HID_Rpt_Desc_Parse(pcore->host.Rx_Buffer, HID_Data->HID_Desc.wItemLength, &HID_Data->parserParams, i);
-			//dbg_printf(DBGMODE_DEBUG, "\r\n HID_Rpt_Desc_Parse \r\n");
+			//dbg_printf(DBGMODE_DEBUG, "HID_Rpt_Desc_Parse Complete \r\n");
 			HID_Rep_Parsing_Params_Debug_Dump(&HID_Data->parserParams);
 		}
 		else {
-			dbg_printf(DBGMODE_ERR, "\r\nUSBH_Get_HID_ReportDescriptor failed status: 0x%04X\r\n", status);
+			dbg_printf(DBGMODE_ERR, "USBH_Get_HID_ReportDescriptor failed status: 0x%04X\r\n", status);
 			USBH_ErrorHandle(pcore, pdev, status);
 			continue;
 		}
 
 		status = USBH_Set_Idle (pcore, pdev, i, 0, 0);
 		if (status == USBH_OK) {
-			dbg_printf(DBGMODE_DEBUG, "\r\nUSBH_Set_Idle OK: 0x%04X\r\n", status);
+			dbg_printf(DBGMODE_DEBUG, "USBH_Set_Idle OK: 0x%04X\r\n", status);
 		}
 		else if(status == USBH_NOT_SUPPORTED) {
-			dbg_printf(DBGMODE_DEBUG, "\r\nUSBH_Set_Idle NOT SUPPORTED\r\n");
+			dbg_printf(DBGMODE_DEBUG, "USBH_Set_Idle NOT SUPPORTED\r\n");
 		}
 		else {
-			dbg_printf(DBGMODE_ERR, "\r\nUSBH_Set_Idle failed status: 0x%04X\r\n", status);
+			dbg_printf(DBGMODE_ERR, "USBH_Set_Idle failed status: 0x%04X\r\n", status);
 			USBH_ErrorHandle(pcore, pdev, status);
 		}
 
 		status = USBH_Set_Protocol(pcore, pdev, i, 0); // this sets the protocol = "report"
 		if (status == USBH_OK) {
-			dbg_printf(DBGMODE_DEBUG, "\r\nUSBH_Set_Protocol OK: 0x%04X\r\n", status);
+			dbg_printf(DBGMODE_DEBUG, "USBH_Set_Protocol OK: 0x%04X\r\n", status);
 		}
 		else {
-			dbg_printf(DBGMODE_ERR, "\r\nUSBH_Set_Protocol failed status: 0x%04X\r\n", status);
+			dbg_printf(DBGMODE_ERR, "USBH_Set_Protocol failed status: 0x%04X\r\n", status);
 			USBH_ErrorHandle(pcore, pdev, status);
 		}
 	}
@@ -342,7 +342,7 @@ static USBH_Status USBH_HID_Handle(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev, u
   volatile unsigned int syncTries = 0xFFFFFFFF;
 
   if (pdev->device_prop.Itf_Desc[intf].bInterfaceClass != 0x03) {
-    //dbg_printf(DBGMODE_TRACE, "\r\n USBH_HID_Handle Interface %d not HID, instead: 0x%02X\r\n", intf, pdev->device_prop.Itf_Desc[intf].bInterfaceClass);
+    //dbg_printf(DBGMODE_TRACE, "USBH_HID_Handle Interface %d not HID, instead: 0x%02X\r\n", intf, pdev->device_prop.Itf_Desc[intf].bInterfaceClass);
     return USBH_OK;
   }
 
@@ -370,7 +370,7 @@ static USBH_Status USBH_HID_Handle(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev, u
 
     /* Sync with start of Even Frame */
       HID_Data->state = HID_GET_DATA;
-      dbg_printf(DBGMODE_TRACE, "\r\n HID state machine (dev %d intf %d) entered HID_GET_DATA \r\n", pdev->device_prop.address, intf);
+      dbg_printf(DBGMODE_TRACE, "HID state machine (dev %d intf %d) entered HID_GET_DATA \r\n", pdev->device_prop.address, intf);
       USBH_Dev_Has_HID = 1;
 
       char isDevRoot = pdev->Parent == 0;
@@ -434,7 +434,7 @@ static USBH_Status USBH_HID_Handle(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev, u
     }
     else {
       // failed to allocate
-      dbg_printf(DBGMODE_ERR, "\r\n Unable to allocate channel for HID dev (addr %d, intf %d, ep 0x%02X) \r\n", pdev->device_prop.address, intf, HID_Data->HIDIntInEp);
+      dbg_printf(DBGMODE_ERR, "Unable to allocate channel for HID dev (addr %d, intf %d, ep 0x%02X) \r\n", pdev->device_prop.address, intf, HID_Data->HIDIntInEp);
       HID_Data->hc_num_in = -1;
     }
     #endif
@@ -453,7 +453,7 @@ static USBH_Status USBH_HID_Handle(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev, u
         HID_Data->start_toggle = 0;
 
         uint8_t len = pcore->host.hc[HID_Data->hc_num_in].xfer_count;
-        vcp_printf("\r\n V%04XP%04XA%dEP%02X:C%d:IntIN:", pdev->device_prop.Dev_Desc.idVendor, pdev->device_prop.Dev_Desc.idProduct, pdev->device_prop.address, HID_Data->HIDIntInEp, len);
+        vcp_printf("V%04XP%04XA%dEP%02X:C%d:IntIN:", pdev->device_prop.Dev_Desc.idVendor, pdev->device_prop.Dev_Desc.idProduct, pdev->device_prop.address, HID_Data->HIDIntInEp, len);
 
         for (uint8_t k = 0; k < len; k++) {
           vcp_printf(" 0x%02X", HID_Data->buff[k]);
@@ -499,7 +499,7 @@ static USBH_Status USBH_HID_Handle(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev, u
     break;
 
   default:
-    dbg_printf(DBGMODE_ERR, "\r\n HID_Handle (dev_addr %d, intf %d) unknown HID_Data->state 0x%02X \r\n", pdev->device_prop.address, intf, HID_Data->state);
+    dbg_printf(DBGMODE_ERR, "HID_Handle (dev_addr %d, intf %d) unknown HID_Data->state 0x%02X \r\n", pdev->device_prop.address, intf, HID_Data->state);
     break;
   }
   return status;
