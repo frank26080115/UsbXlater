@@ -125,7 +125,7 @@ USB_OTG_STS USB_OTG_CoreReset(USB_OTG_CORE_HANDLE *pcore)
 {
   USB_OTG_STS status = USB_OTG_OK;
   __IO USB_OTG_GRSTCTL_TypeDef  greset;
-  uint32_t count = 0;
+  volatile uint32_t count = 0;
 
   greset.d32 = 0;
   /* Wait for AHB master IDLE state. */
@@ -467,7 +467,7 @@ USB_OTG_STS USB_OTG_FlushTxFifo (USB_OTG_CORE_HANDLE *pcore , uint32_t num )
   USB_OTG_STS status = USB_OTG_OK;
   __IO USB_OTG_GRSTCTL_TypeDef  greset;
 
-  uint32_t count = 0;
+  volatile uint32_t count = 0;
   greset.d32 = 0;
   greset.b.txfflsh = 1;
   greset.b.txfnum  = num;
@@ -496,7 +496,7 @@ USB_OTG_STS USB_OTG_FlushRxFifo( USB_OTG_CORE_HANDLE *pcore )
 {
   USB_OTG_STS status = USB_OTG_OK;
   __IO USB_OTG_GRSTCTL_TypeDef  greset;
-  uint32_t count = 0;
+  volatile uint32_t count = 0;
 
   greset.d32 = 0;
   greset.b.rxfflsh = 1;

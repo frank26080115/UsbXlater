@@ -157,6 +157,7 @@ USBH_Status USBH_CtlReq_Blocking (	USB_OTG_CORE_HANDLE *pcore,
 	USBH_Status status;
 
 	delay_1ms_cnt = timeout;
+	dbg_trace(); // possible freeze
 	while (delay_1ms_cnt > 0 && pdev->Control.state != CTRL_COMPLETE && pdev->Control.state != CTRL_IDLE && pdev->Control.state != CTRL_ERROR && pdev->Control.state != CTRL_STALLED);
 	{
 		status = USBH_HandleControl(pcore, pdev);
@@ -167,6 +168,7 @@ USBH_Status USBH_CtlReq_Blocking (	USB_OTG_CORE_HANDLE *pcore,
 	}
 
 	delay_1ms_cnt = timeout;
+	dbg_trace(); // possible freeze
 	do
 	{
 		status = USBH_CtlReq(pcore, pdev, buff , length );

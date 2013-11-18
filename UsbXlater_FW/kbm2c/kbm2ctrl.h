@@ -5,6 +5,8 @@
 #include <usbotg_lib/usb_core.h>
 #include "hidrpt.h"
 
+// DEFINITIONS
+
 #define KBM2C_MAX_KEYACTIONS   32
 #define KBM2C_MAX_MOUSEACTIONS 16
 #define KBM2C_KEYFLAGS_SIZE    (256 / 32)
@@ -13,6 +15,16 @@
 #define KBM2C_CHECKKEY(x, flags) (((flags)[(x) / 32] & (1UL << ((x) % 32))) != 0)
 #define KBM2C_CHECKMODKEY(x, flags) (((flags)[KBM2C_KEYFLAGS_SIZE - 1] & (x)) != 0)
 #define KBM2C_APPLY_DEADZONE(x, dz) (((x) > 0) ? ((x) + (dz)) : (((x) < 0) ? ((x) - (dz)) : (x)))
+
+// TYPEDEFS
+
+typedef enum
+{
+	KBM2C_OK = 0,
+	KBM2C_ERR_CHKSUM,
+	KBM2C_ERR_FLASH_NOT_EMPTY,
+}
+kbm2c_err_t;
 
 typedef enum
 {
@@ -44,22 +56,19 @@ typedef struct
 }
 mouseaction_pair_t;
 
-typedef enum
+typedef struct
 {
-	TRIGSTATE_RELEASED,
-	TRIGSTATE_GOING_DOWN,
-	TRIGSTATE_FULLY_DOWN,
-	TRIGSTATE_GOING_UP,
+	int16_t val;
+	char shouldPress;
+	char shouldRelease;
+	enum {
+		TRIGSTATE_RELEASED,
+		TRIGSTATE_PRESSING,
+		TRIGSTATE_PRESSED,
+		TRIGSTATE_RELEASING,
+	} state;
 }
-trigger_state_t;
-
-typedef enum
-{
-	TRIGQUEUE_NONE = 0x00,
-	TRIGQUEUE_DOWN = 0x01,
-	TRIGQUEUE_UP   = 0x02,
-}
-trigger_queue_t;
+kbm2c_trigger_data_t;
 
 typedef struct
 {
@@ -84,19 +93,23 @@ typedef struct
 	mousemap_t          mousemap;
 	keyaction_pair_t    keyaction[KBM2C_MAX_KEYACTIONS];
 	mouseaction_pair_t  mouseaction[KBM2C_MAX_MOUSEACTIONS];
-	uint8_t             left_deadzone;
-	uint8_t             right_deadzone;
-	uint16_t            stick_max;
-	uint8_t             trigger_speed;
-	float               left_gain;
-	float               right_gain;
-	float               left_gain_alt;
-	float               right_gain_alt;
-	float               left_curve;
-	float               right_curve;
+	uint8_t             left_stick_deadzone;
+	uint8_t             right_stick_deadzone;
+	uint16_t            left_stick_max;
+	uint16_t            right_stick_max;
+	uint8_t             trigger_up_speed;
+	uint8_t             trigger_down_speed;
+	double              left_stick_gain[3];
+	double              right_stick_gain[3];
+	uint8_t             left_stick_curve[131];
+	uint8_t             right_stick_curve[131];
+	double              mouse_filter;
+	double              mouse_decay;
+
 	float               wasd_accel;
 	float               wasd_decay;
 	turbo_config_t      turbo_config;
+	uint16_t            checksum;
 }
 kbm2c_config_t;
 
@@ -184,9 +197,55 @@ typedef struct
 }
 ds3_packet_t;
 
-void kbm2c_mouseDidNotMove();
+typedef struct
+{
+	uint8_t report_id;
+	uint8_t stick_left_x;
+	uint8_t stick_left_y;
+	uint8_t stick_right_x;
+	uint8_t stick_right_y;
+	uint16_t btnBits;
+	uint8_t counter;
+	uint8_t left_trigger;
+	uint8_t right_trigger;
+	uint8_t unknown1;
+	uint8_t unknown2;
+	uint8_t unknown3;
+	int16_t gyro_x;
+	int16_t gyro_y;
+	int16_t gyro_z;
+	int16_t accel_x;
+	int16_t accel_y;
+	int16_t accel_z;
+	uint8_t unknown4; // 0x08
+	uint8_t unknown5; // 0x00
+	uint8_t unknown6; // 0x00
+	uint8_t unknown7; // 0x00
+	uint8_t unknown8; // 0x00
+	uint8_t unknown9; // 0x00
+	uint8_t unknown10; // 0x1B
+	uint8_t unknown11; // 0x00
+	uint8_t unknown12; // 0x00
+	uint8_t unknown13; // 0x01, sometimes 0x02, possibly number of touches
+	// TODO: more reverse engineering
+	uint8_t the_rest[64 - 25]; // starting from idx 25
+}
+ds4_packet_t;
+
+// EXTERN VARIABLES
+
+extern kbm2c_config_t kbm2c_config;
+
+// FUNCTION PROTOTYPES
+
+void kbm2c_init();
 void kbm2c_handleMouseReport(uint8_t* data, uint8_t len, HID_Rpt_Parsing_Params_t* parser);
 void kbm2c_handleKeyReport(uint8_t modifier, uint8_t* data, uint8_t len);
-void kbm2c_report(USB_OTG_CORE_HANDLE *pcore);
+void kbm2c_handleDs4Report(uint8_t* data);
+void kbm2c_task(char force);
+void kbm2c_prepForDS3();
+void kbm2c_coordCalc(double* xptr, double* yptr, double gain, double dz, double lim, uint8_t* curve);
+void kbm2c_deadZoneCalc(double* xptr, double* yptr, double dz);
+void kbm2c_inactiveStickCalc(double* xptr, double* yptr, int8_t* randDeadZone, uint8_t dz, int16_t fillerX, int16_t fillerY);
 
 #endif

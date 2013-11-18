@@ -60,6 +60,7 @@ static inline void delay_ms(const uint32_t x)
 }
 
 void jump_to_bootloader(void);
+uint16_t fletcher16(uint8_t const * data, size_t bytes);
 
 #ifdef  USE_FULL_ASSERT
 

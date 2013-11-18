@@ -143,7 +143,7 @@ static uint8_t USBD_CDC_AltSet;
 char USBD_CDC_IsReady = 0;
 
 /**
- * @brief  USBD_CDC_HWInit
+ * @brief  USBD_CDC_ClassInit
  *         Initilaize the CDC interface
  * @param  pdev: device instance
  * @param  cfgidx: Configuration index
@@ -186,7 +186,7 @@ static uint8_t  USBD_CDC_ClassInit (void* pdev, uint8_t cfgidx)
 }
 
 /**
- * @brief  USBD_CDC_HWDeInit
+ * @brief  USBD_CDC_ClassDeInit
  *         DeInitialize the CDC layer
  * @param  pdev: device instance
  * @param  cfgidx: Configuration index

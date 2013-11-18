@@ -274,6 +274,7 @@ static uint32_t USB_OTG_USBH_handle_nptxfempty_ISR (USB_OTG_CORE_HANDLE *pcore)
 
   len_words = (pcore->host.hc[hnptxsts.b.nptxqtop.chnum].xfer_len + 3) / 4;
 
+  //dbg_trace(); // possible freeze
   while ((hnptxsts.b.nptxfspcavail > len_words)&&
          (pcore->host.hc[hnptxsts.b.nptxqtop.chnum].xfer_len != 0))
   {
@@ -322,6 +323,7 @@ static uint32_t USB_OTG_USBH_handle_ptxfempty_ISR (USB_OTG_CORE_HANDLE *pcore)
 
   len_words = (pcore->host.hc[hptxsts.b.ptxqtop.chnum].xfer_len + 3) / 4;
 
+  //dbg_trace(); // possible freeze
   while ((hptxsts.b.ptxfspcavail > len_words)&&
          (pcore->host.hc[hptxsts.b.ptxqtop.chnum].xfer_len != 0))
   {

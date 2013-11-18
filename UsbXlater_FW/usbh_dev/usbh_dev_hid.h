@@ -44,6 +44,7 @@ typedef struct HID_cb
 {
 	void  (*Init)   (USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev, uint8_t intf);
 	void  (*Decode) (USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev, uint8_t intf, uint8_t ep, uint8_t *data, uint8_t len);
+	void  (*DeInit) (USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev, uint8_t intf);
 } HID_cb_TypeDef;
 
 // there's no use for this struct in UsbXlater yet

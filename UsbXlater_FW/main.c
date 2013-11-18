@@ -1,8 +1,8 @@
 #include "cereal.h"
 #include "led.h"
 #include "vcp.h"
-#include "kbm2ctrl.h"
 #include "utilities.h"
+#include <kbm2c/kbm2ctrl.h>
 #include <stdlib.h>
 #include <string.h>
 #include <cmsis/swo.h>
@@ -29,6 +29,7 @@ USBH_DEV					USBH_Dev;
 static volatile char		send_ds3_report;
 volatile uint32_t			systick_1ms_cnt;
 volatile uint32_t			delay_1ms_cnt;
+volatile uint32_t			run_cnt;
 
 uint8_t cmdHandler();
 
@@ -75,6 +76,8 @@ int main(void)
 	led_3_on(); delay_ms(200); led_3_off();
 	led_4_on(); delay_ms(200); led_4_off();
 
+	kbm2c_init();
+
 	USBD_ExPullUp_Idle();
 
 	USB_Hub_Hardware_Init();
@@ -119,6 +122,8 @@ int main(void)
 
 	while (1)
 	{
+		run_cnt++;
+
 		USBH_Process(&USB_OTG_Core_host, &USBH_Dev);
 
 		if (host_intf_state == HISTATE_NONE && USBH_Dev.gState == HOST_DO_TASK) {
@@ -131,7 +136,7 @@ int main(void)
 
 		if (dev_intf_state == DISTATE_CONNECTED && USBD_Host_Is_PS3 != 0) {
 			// TODO: handle PS4 and Xbox
-			dbg_printf(DBGMODE_TRACE, "Entering CTRLER Mode \r\n");
+			dbg_printf(DBGMODE_TRACE, "Entering CTRLER Mode\r\n");
 			dev_intf_state = DISTATE_CTRLER_PS3;
 		}
 
@@ -155,7 +160,7 @@ int main(void)
 			// force a reconnection to reenumerate as CDC
 			DCD_DevConnect(&USB_OTG_Core_dev);
 
-			dbg_printf(DBGMODE_TRACE, "Entering VCP Mode \r\n");
+			dbg_printf(DBGMODE_TRACE, "Entering VCP Mode\r\n");
 		}
 
 		uint8_t ret = cmdHandler();
@@ -177,16 +182,7 @@ int main(void)
 			run_bootload();
 		}
 
-		if (send_ds3_report != 0)
-		{
-			send_ds3_report = 0;
-			if (dev_intf_state == DISTATE_CTRLER_PS3) {
-				kbm2c_report(&USB_OTG_Core_dev);
-			}
-			else {
-				// TODO: this happens every 10ms, what should we do here?
-			}
-		}
+		kbm2c_task(0);
 
 		if (host_intf_state == HISTATE_READY && dev_intf_state == DISTATE_CTRLER_PS3) {
 			// this is the main operating mode
@@ -199,19 +195,81 @@ int main(void)
 	// this loop is much tighter
 	while (1)
 	{
+		run_cnt++;
+
 		USBH_Process(&USB_OTG_Core_host, &USBH_Dev);
-		if (send_ds3_report != 0)
-		{
-			send_ds3_report = 0;
-			kbm2c_report(&USB_OTG_Core_dev);
-		}
+		kbm2c_task(0);
 	}
 
 	return 0;
 }
 
+void prvGetRegistersFromStack2( uint32_t *pulFaultStackAddress )
+{
+	/* These are volatile to try and prevent the compiler/linker optimising them
+	away as the variables never actually get used.  If the debugger won't show the
+	values of the variables, make them global my moving their declaration outside
+	of this function. */
+	volatile uint32_t r0;
+	volatile uint32_t r1;
+	volatile uint32_t r2;
+	volatile uint32_t r3;
+	volatile uint32_t r12;
+	volatile uint32_t lr; /* Link register. */
+	volatile uint32_t pc; /* Program counter. */
+	volatile uint32_t psr;/* Program status register. */
+
+	r0 = pulFaultStackAddress[ 0 ];
+	r1 = pulFaultStackAddress[ 1 ];
+	r2 = pulFaultStackAddress[ 2 ];
+	r3 = pulFaultStackAddress[ 3 ];
+
+	r12 = pulFaultStackAddress[ 4 ];
+	lr  = pulFaultStackAddress[ 5 ];
+	pc  = pulFaultStackAddress[ 6 ];
+	psr = pulFaultStackAddress[ 7 ];
+
+	/* When the following line is hit, the variables contain the register values. */
+	dbg_printf(DBGMODE_ERR, "\r\n Freeze Handler\r\n");
+	dbg_printf(DBGMODE_ERR, "r0: 0x%08X, r1: 0x%08X, r2: 0x%08X, r3: 0x%08X,", r0, r1, r2, r3);
+	dbg_printf(DBGMODE_ERR, " r12: 0x%08X\r\nLR: 0x%08X, PC: 0x%08X, PSR: 0x%08X, \r\n", r12, lr, pc, psr);
+}
+
 void SysTick_Handler(void)
 {
+	static uint32_t prevRunCnt;
+	static uint32_t freezeCnt;
+	if (systick_1ms_cnt > 5000)
+	{
+		if (prevRunCnt == 0) {
+			prevRunCnt = run_cnt;
+		}
+		if (prevRunCnt == run_cnt)
+		{
+			freezeCnt++;
+			if (freezeCnt > 100)
+			{
+				// possible freeze
+				led_1_on();led_2_on();led_3_on();led_4_on();
+				__asm volatile
+				(
+					" tst lr, #4                                                \n"
+					" ite eq                                                    \n"
+					" mrseq r0, msp                                             \n"
+					" mrsne r0, psp                                             \n"
+					" ldr r1, [r0, #24]                                         \n"
+					" ldr r2, handler6_address_const                            \n"
+					" bx r2                                                     \n"
+					" handler6_address_const: .word prvGetRegistersFromStack2    \n"
+				);
+			}
+		}
+		else {
+			prevRunCnt = run_cnt;
+			freezeCnt = 0;
+		}
+	}
+
 	if (delay_1ms_cnt > 0) {
 		delay_1ms_cnt--;
 	}
@@ -229,7 +287,7 @@ void SysTick_Handler(void)
 
 void run_passthrough()
 {
-	dbg_printf(DBGMODE_TRACE, "\r\n Entering Pass-Through Mode \r\n");
+	dbg_printf(DBGMODE_TRACE, "\r\n Entering Pass-Through Mode\r\n");
 
 	// force a disconnection
 	HCD_ResetPort(&USB_OTG_Core_host);
@@ -253,7 +311,7 @@ void run_passthrough()
 
 void run_bootload()
 {
-	dbg_printf(DBGMODE_TRACE, "Entering Bootloader Mode \r\n");
+	dbg_printf(DBGMODE_TRACE, "\r\n Entering Bootloader Mode\r\n");
 
 	// small delay for trace message
 	delay_1ms_cnt = 200;

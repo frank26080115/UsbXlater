@@ -30,6 +30,9 @@
 #define USBD_DEV_DS3_HIDREPORTDESCRIPTOR_SIZE 148
 #define USBD_DEV_DS3_HIDREPORTDESCRIPTOR_ADDITIONAL_SIZE 121
 
+uint8_t USBD_Dev_DS3_SendReport (USB_OTG_CORE_HANDLE *pcore,
+                                uint8_t *report,
+                                uint16_t len);
 uint8_t USBD_Dev_DS3_ClassInit         (void *pcore , uint8_t cfgidx);
 uint8_t USBD_Dev_DS3_ClassDeInit       (void *pcore , uint8_t cfgidx);
 uint8_t USBD_Dev_DS3_Setup             (void *pcore , USB_SETUP_REQ  *req);

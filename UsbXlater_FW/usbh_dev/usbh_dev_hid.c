@@ -10,7 +10,8 @@
 #include <core_cmInstr.h>
 #include <vcp.h>
 #include <hidrpt.h>
-#include <kbm2ctrl.h>
+#include <kbm2c/kbm2ctrl.h>
+#include "usbh_dev_dualshock.h"
 
 static void USBH_ParseHIDDesc (USBH_HIDDesc_TypeDef *desc, uint8_t *buf);
 static USBH_Status USBH_HID_Handle(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *phost, uint8_t intf);
@@ -63,6 +64,10 @@ void HID_Decode_Default_Handler(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev, uint
 	}
 }
 
+void HID_DeInit_Default_Handler(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev, uint8_t intf)
+{
+}
+
 void USBH_Dev_HID_FreeData(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
 {
 	uint8_t numIntf = pdev->device_prop.Cfg_Desc.bNumInterfaces;
@@ -74,6 +79,7 @@ void USBH_Dev_HID_FreeData(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
 			if (HID_Data != 0)
 			{
 				if (HID_Data->cb != 0) {
+					HID_Data->cb->DeInit(pcore, pdev, i);
 					free(HID_Data->cb);
 					HID_Data->cb = 0;
 				}
@@ -187,10 +193,31 @@ void USBH_Dev_HID_EnumerationDone(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
 
 		HID_Data_t* HID_Data = &(((HID_Data_t*)(pdev->Usr_Data))[i]);
 
-		HID_Data->cb         = malloc(sizeof(HID_cb_TypeDef));
-		HID_Data->cb->Init   = HID_Init_Default_Handler;
-		HID_Data->cb->Decode = HID_Decode_Default_Handler;
-		HID_Data->state      = HID_IDLE;
+		HID_Data->cb = malloc(sizeof(HID_cb_TypeDef));
+
+		if (pdev->device_prop.Dev_Desc.idVendor == 0x054C && pdev->device_prop.Dev_Desc.idProduct == 0x0268) {
+			// DUALSHOCK3
+			HID_Data->cb->Init   = USBH_DS3_Init_Handler;
+			HID_Data->cb->Decode = USBH_DS3_Decode_Handler;
+			HID_Data->cb->DeInit = USBH_DS3_DeInit_Handler;
+			dbg_printf(DBGMODE_TRACE, "Dualshock 3 Detected\r\n");
+		}
+		else if (pdev->device_prop.Dev_Desc.idVendor == 0x054C && pdev->device_prop.Dev_Desc.idProduct == 0x05C4) {
+			// DUALSHOCK4
+			HID_Data->cb->Init   = USBH_DS4_Init_Handler;
+			HID_Data->cb->Decode = USBH_DS4_Decode_Handler;
+			HID_Data->cb->DeInit = USBH_DS4_DeInit_Handler;
+			dbg_printf(DBGMODE_TRACE, "Dualshock 4 Detected\r\n");
+		}
+		// TODO handle others, like Xbox controllers
+		else {
+			// other, probably keyboard or mouse
+			HID_Data->cb->Init   = HID_Init_Default_Handler;
+			HID_Data->cb->Decode = HID_Decode_Default_Handler;
+			HID_Data->cb->DeInit = HID_DeInit_Default_Handler;
+		}
+
+		HID_Data->state = HID_IDLE;
 		HID_Rpt_Parsing_Params_Reset(&HID_Data->parserParams);
 
 		uint8_t maxEP = ( (pdev->device_prop.Itf_Desc[i].bNumEndpoints <= USBH_MAX_NUM_ENDPOINTS) ?

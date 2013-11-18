@@ -71,7 +71,7 @@ int _write(int file, char *ptr, int len)
 __attribute__ ((used))
 void abort(void)
 {
-  /* Abort called */
+  dbg_printf(DBGMODE_ERR, "\r\nabort()\r\n");
   while(1);
 }
           

@@ -31,6 +31,24 @@ void jump_to_bootloader(void)
 	while(1);
 }
 
+uint16_t fletcher16(uint8_t const * data, size_t bytes)
+{
+	uint16_t sum1 = 0xff, sum2 = 0xff;
+	while (bytes)
+	{
+		size_t tlen = bytes > 20 ? 20 : bytes;
+		bytes -= tlen;
+		do {
+			sum2 += sum1 += *data++;
+		} while (--tlen);
+		sum1 = (sum1 & 0xff) + (sum1 >> 8);
+		sum2 = (sum2 & 0xff) + (sum2 >> 8);
+	}
+	sum1 = (sum1 & 0xff) + (sum1 >> 8);
+	sum2 = (sum2 & 0xff) + (sum2 >> 8);
+	return sum2 << 8 | sum1;
+}
+
 #ifdef  USE_FULL_ASSERT
 /**
   * @brief  Reports the name of the source file and the source line number
@@ -41,12 +59,7 @@ void jump_to_bootloader(void)
   */
 void assert_failed(uint8_t* file, uint32_t line)
 {
-  /* User can add his own implementation to report the file name and line number,
-     ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
-
-  /* Infinite loop */
-  while (1)
-  {
-  }
+  dbg_printf(DBGMODE_ERR, "\r\nassert failed %s %d\r\n", file, line);
+  while (1) { }
 }
 #endif
