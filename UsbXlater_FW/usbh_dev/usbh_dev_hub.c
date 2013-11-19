@@ -300,6 +300,8 @@ USBH_Status USBH_Dev_Hub_Task(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 
 		Hub_Data->state = HubState_POLL;
 		Hub_Data->timer = HCD_GetCurrentFrame(pcore);
+
+		dbgwdg_feed();
 	}
 	#ifdef HUB_ENABLE_DYNAMIC_HC_ALLOC
     }

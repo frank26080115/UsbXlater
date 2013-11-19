@@ -269,18 +269,9 @@ const uint8_t USBD_Dev_DS3_HIDReportDescriptor_Additional[USBD_DEV_DS3_HIDREPORT
 };
 #endif
 
-const uint8_t USBD_LangIDDesc[USBD_LANGIDDESC_SIZE] =
-{
-	USBD_LANGIDDESC_SIZE,
-	USB_DESC_TYPE_STRING,
-	0x09, 0x04,
-};
-
-uint8_t USBD_Dev_DS3_bufTemp[64];
 static char USBD_Dev_DS3_buf3f5HasRead = 0;
-static uint8_t USBD_Dev_DS3_masterBdaddr[6];
 static uint8_t USBD_Dev_DS3_3efByte6 = 0xB0;
-static uint16_t USBD_Dev_DS3_lastWValue;
+char USBD_Dev_DS3_IsActive = 0;
 
 // a lot of these byte arrays are taken from gimx.fr's code, thanks
 
@@ -355,7 +346,7 @@ const uint8_t ds3_buf3f7[] = {
     0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
 };
 
-uint8_t USBD_HID_Protocol, USBD_HID_IdleState, USBD_HID_AltSet;
+static uint8_t USBD_HID_Protocol, USBD_HID_IdleState, USBD_HID_AltSet;
 #ifdef ENABLE_DS3_ADDITIONAL_FEATURES
 uint8_t USBD_HID_Protocol2, USBD_HID_IdleState2, USBD_HID_AltSet2;
 #endif
@@ -377,6 +368,7 @@ uint8_t USBD_Dev_DS3_ClassInit         (void *pcore , uint8_t cfgidx)
                 USB_OTG_EP_INT);
 
     USBD_Host_Is_PS3 = 0;
+    USBD_Dev_DS3_IsActive = 1;
 
 	#ifdef ENABLE_DS3_ADDITIONAL_FEATURES
 	DCD_EP_Open(pcore,
@@ -396,13 +388,18 @@ uint8_t USBD_Dev_DS3_ClassDeInit       (void *pcore , uint8_t cfgidx)
 	DCD_EP_Close (pcore , 0x83);
 	#endif
 
-	dbg_printf(DBGMODE_ERR, "USBD_Dev_DS3_ClassDeInit\r\n");
+	USBD_Host_Is_PS3 = 0;
+	USBD_Dev_DS3_IsActive = 0;
+
+	dbg_printf(DBGMODE_TRACE, "USBD_Dev_DS3_ClassDeInit\r\n");
 
 	return USBD_OK;
 }
 
 uint8_t USBD_Dev_DS3_Setup             (void *pcore , USB_SETUP_REQ  *req)
 {
+	dbgwdg_feed();
+
 	uint16_t len = 0;
 	uint8_t  *pbuf = NULL;
 
@@ -417,32 +414,32 @@ uint8_t USBD_Dev_DS3_Setup             (void *pcore , USB_SETUP_REQ  *req)
 			USBD_CtlSendData (pcore, (uint8_t *)ds3_buf3f2, req->wLength);
 		}
 		else if (req->wValue == 0x03F5) {
-			memcpy(USBD_Dev_DS3_bufTemp, ds3_buf3f5, req->wLength);
+			memcpy(USBD_Dev_DS_bufTemp, ds3_buf3f5, req->wLength);
 			if (USBD_Dev_DS3_buf3f5HasRead == 0) {
 				USBD_Dev_DS3_buf3f5HasRead = 1;
 			}
 			else {
-				memcpy(&(USBD_Dev_DS3_bufTemp[2]), USBD_Dev_DS3_masterBdaddr, 6);
+				memcpy(&(USBD_Dev_DS_bufTemp[2]), USBD_Dev_DS_masterBdaddr, 6);
 			}
-			USBD_CtlSendData (pcore, (uint8_t *)USBD_Dev_DS3_bufTemp, req->wLength);
+			USBD_CtlSendData (pcore, (uint8_t *)USBD_Dev_DS_bufTemp, req->wLength);
 		}
 		else if (req->wValue == 0x03EF) {
-			memcpy(USBD_Dev_DS3_bufTemp, ds3_buf3ef, req->wLength);
-			USBD_Dev_DS3_bufTemp[7] = USBD_Dev_DS3_3efByte6;
-			USBD_CtlSendData (pcore, (uint8_t *)USBD_Dev_DS3_bufTemp, req->wLength);
+			memcpy(USBD_Dev_DS_bufTemp, ds3_buf3ef, req->wLength);
+			USBD_Dev_DS_bufTemp[7] = USBD_Dev_DS3_3efByte6;
+			USBD_CtlSendData (pcore, (uint8_t *)USBD_Dev_DS_bufTemp, req->wLength);
 		}
 		else if (req->wValue == 0x03F8) {
-			memcpy(USBD_Dev_DS3_bufTemp, ds3_buf3f8, req->wLength);
-			USBD_Dev_DS3_bufTemp[7] = USBD_Dev_DS3_3efByte6; // not known if required
-			USBD_CtlSendData (pcore, (uint8_t *)USBD_Dev_DS3_bufTemp, req->wLength);
+			memcpy(USBD_Dev_DS_bufTemp, ds3_buf3f8, req->wLength);
+			USBD_Dev_DS_bufTemp[7] = USBD_Dev_DS3_3efByte6; // not known if required
+			USBD_CtlSendData (pcore, (uint8_t *)USBD_Dev_DS_bufTemp, req->wLength);
 		}
 		else if (req->wValue == 0x03F7) {
 			USBD_CtlSendData (pcore, (uint8_t *)ds3_buf3f7, req->wLength);
 		}
 		else {
 			// should never reach here
-			memset(USBD_Dev_DS3_bufTemp, 0, 0x40);
-			USBD_CtlSendData (pcore, (uint8_t *)USBD_Dev_DS3_bufTemp, req->wLength);
+			memset(USBD_Dev_DS_bufTemp, 0, 0x40);
+			USBD_CtlSendData (pcore, (uint8_t *)USBD_Dev_DS_bufTemp, req->wLength);
 			dbg_printf(DBGMODE_ERR, "Request with unknown wValue (0x%04X) from PS3\r\n", req->wValue);
 		}
 		return USBD_OK;
@@ -451,8 +448,8 @@ uint8_t USBD_Dev_DS3_Setup             (void *pcore , USB_SETUP_REQ  *req)
 	if ((req->bmRequest & USB_REQ_RECIPIENT_MASK) == USB_REQ_RECIPIENT_INTERFACE && (req->bmRequest & USB_REQ_TYPE_MASK) == USB_REQ_TYPE_CLASS && (req->bmRequest & 0x80) == 0x00 && req->bRequest == HID_REQ_SET_REPORT && req->wIndex == 0)
 	{
 		if (req->wValue == 0x03F5 || req->wValue == 0x03EF || req->wValue == 0x03F2 || req->wValue == 0x03F4) {
-			USBD_Dev_DS3_lastWValue = req->wValue;
-			USBD_CtlPrepareRx (pcore, (uint8_t *)USBD_Dev_DS3_bufTemp, req->wLength);
+			USBD_Dev_DS_lastWValue = req->wValue;
+			USBD_CtlPrepareRx (pcore, (uint8_t *)USBD_Dev_DS_bufTemp, req->wLength);
 			return USBD_OK;
 		}
 	}
@@ -460,8 +457,8 @@ uint8_t USBD_Dev_DS3_Setup             (void *pcore , USB_SETUP_REQ  *req)
 	if (req->bmRequest == 0x21 && req->bRequest == HID_REQ_SET_IDLE && req->wIndex == 0)
 	{
 		USBD_HID_IdleState = (uint8_t)(req->wValue >> 8);
-		USBD_Dev_DS3_lastWValue = req->wValue;
-		USBD_CtlPrepareRx (pcore, (uint8_t *)USBD_Dev_DS3_bufTemp, req->wLength);
+		USBD_Dev_DS_lastWValue = req->wValue;
+		USBD_CtlPrepareRx (pcore, (uint8_t *)USBD_Dev_DS_bufTemp, req->wLength);
 		return USBD_OK;
 	}
 
@@ -497,12 +494,12 @@ uint8_t USBD_Dev_DS3_Setup             (void *pcore , USB_SETUP_REQ  *req)
 
 				case HID_REQ_GET_REPORT:
 					// TODO: prep data
-					USBD_CtlSendData (pcore, (uint8_t *)USBD_Dev_DS3_bufTemp, req->wLength);
+					USBD_CtlSendData (pcore, (uint8_t *)USBD_Dev_DS_bufTemp, req->wLength);
 					break;
 
 				case HID_REQ_SET_REPORT:
 					// TODO: handle data
-					USBD_CtlPrepareRx (pcore, (uint8_t *)USBD_Dev_DS3_bufTemp, req->wLength);
+					USBD_CtlPrepareRx (pcore, (uint8_t *)USBD_Dev_DS_bufTemp, req->wLength);
 					break;
 
 				default:
@@ -536,12 +533,12 @@ uint8_t USBD_Dev_DS3_Setup             (void *pcore , USB_SETUP_REQ  *req)
 
 					case HID_REQ_GET_REPORT:
 						// TODO: prep data
-						USBD_CtlSendData (pcore, (uint8_t *)USBD_Dev_DS3_bufTemp, req->wLength);
+						USBD_CtlSendData (pcore, (uint8_t *)USBD_Dev_DS_bufTemp, req->wLength);
 						break;
 
 					case HID_REQ_SET_REPORT:
 						// TODO: handle data
-						USBD_CtlPrepareRx (pcore, (uint8_t *)USBD_Dev_DS3_bufTemp, req->wLength);
+						USBD_CtlPrepareRx (pcore, (uint8_t *)USBD_Dev_DS_bufTemp, req->wLength);
 						break;
 
 					default:
@@ -648,8 +645,12 @@ uint8_t USBD_Dev_DS3_SendReport (USB_OTG_CORE_HANDLE *pcore,
 {
 	static char repCnt;
 
-	if (pcore->dev.device_status == USB_OTG_CONFIGURED)
+	if (pcore->dev.device_status == USB_OTG_CONFIGURED && USBD_Dev_DS3_IsActive != 0)
 	{
+		dbgwdg_feed();
+
+		dbg_trace();
+
 		DCD_EP_Tx (pcore, USBD_Dev_DS3_D2H_EP, report, len);
 
 		if (repCnt > 50) {
@@ -667,7 +668,6 @@ uint8_t USBD_Dev_DS3_SendReport (USB_OTG_CORE_HANDLE *pcore,
 
 uint8_t USBD_Dev_DS3_EP0_TxSent        (void *pcore )
 {
-	// TODO: implement
 	return USBD_OK;
 }
 
@@ -688,25 +688,25 @@ uint8_t USBD_Dev_DS3_DataOut            (void *pcore , uint8_t epnum)
 {
 	if (epnum == 0x00)
 	{
-		if (USBD_Dev_DS3_lastWValue == 0x03F5)
+		if (USBD_Dev_DS_lastWValue == 0x03F5)
 		{
-			memcpy(USBD_Dev_DS3_masterBdaddr, &(USBD_Dev_DS3_bufTemp[2]), 6);
+			memcpy(USBD_Dev_DS_masterBdaddr, &(USBD_Dev_DS_bufTemp[2]), 6);
 			USBD_Host_Is_PS3 = 1;
 		}
-		else if (USBD_Dev_DS3_lastWValue == 0x03EF)
+		else if (USBD_Dev_DS_lastWValue == 0x03EF)
 		{
-			USBD_Dev_DS3_3efByte6 = USBD_Dev_DS3_bufTemp[6];
+			USBD_Dev_DS3_3efByte6 = USBD_Dev_DS_bufTemp[6];
 		}
-		else if (USBD_Dev_DS3_lastWValue == 0x03F4)
+		else if (USBD_Dev_DS_lastWValue == 0x03F4)
 		{
-			if (USBD_Dev_DS3_bufTemp[1] == 0x08) {
+			if (USBD_Dev_DS_bufTemp[1] == 0x08) {
 				// TODO: handle system shutdown
 			}
 			else {
 				// TODO: enable reporting
 			}
 		}
-		else if (USBD_Dev_DS3_lastWValue == 0x03F8)
+		else if (USBD_Dev_DS_lastWValue == 0x03F8)
 		{
 			// I don't think we have to handle this case
 		}

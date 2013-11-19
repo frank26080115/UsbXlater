@@ -60,6 +60,7 @@ uint16_t fletcher16(uint8_t const * data, size_t bytes)
 void assert_failed(uint8_t* file, uint32_t line)
 {
   dbg_printf(DBGMODE_ERR, "\r\nassert failed %s %d\r\n", file, line);
+  dbgwdg_stop();
   while (1) { }
 }
 #endif

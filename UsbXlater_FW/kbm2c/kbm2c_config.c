@@ -2,6 +2,9 @@
 #include "kbm2ctrl_keycodes.h"
 #include <stm32f2xx.h>
 #include <stm32f2xx_flash.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 
 #define KBM2C_CONFIG_SECTOR FLASH_Sector_11
 #define KBM2C_FLASH_START   0x080E0000

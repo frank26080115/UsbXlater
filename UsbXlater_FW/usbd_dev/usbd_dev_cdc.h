@@ -25,6 +25,7 @@
 #define USBD_Dev_CDC_D2H_EP_SZ                 CDC_DATA_IN_PACKET_SIZE
 #define USBD_Dev_CDC_H2D_EP_SZ                 CDC_DATA_OUT_PACKET_SIZE
 #define USBD_Dev_CDC_CMD_EP_SZ                 CDC_CMD_PACKET_SZE
+//#define CDC_D2H_FIFO_SIZE                      (256-16)
 
 #define USB_DEVICE_DESCRIPTOR_TYPE              0x01
 #define USB_CONFIGURATION_DESCRIPTOR_TYPE       0x02

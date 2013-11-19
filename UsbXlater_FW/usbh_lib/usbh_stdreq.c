@@ -510,7 +510,6 @@ void  USBH_ParseCfgDesc (USBH_CfgDesc_TypeDef* cfg_desc,
     {
       pif = (USBH_InterfaceDesc_TypeDef *)0;
 
-      dbg_trace(); // possible freeze
       while (ptr < cfg_desc->wTotalLength )
       {
         pdesc = USBH_GetNextDesc((uint8_t *)pdesc, &ptr);
@@ -527,7 +526,6 @@ void  USBH_ParseCfgDesc (USBH_CfgDesc_TypeDef* cfg_desc,
           /* Parse Ep descriptors relative to the current interface */
           if(temp_pif.bNumEndpoints <= USBH_MAX_NUM_ENDPOINTS)
           {
-            dbg_trace(); // possible freeze
             while (ep_ix < temp_pif.bNumEndpoints)
             {
               pdesc = USBH_GetNextDesc((void* )pdesc, &ptr);

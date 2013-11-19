@@ -22,6 +22,7 @@ typedef struct
 	volatile uint8_t	size;	// size of the buffer's underlying storage array
 	volatile uint8_t	count;	// number of bytes currently stored in the buffer
 	volatile uint8_t	flag;
+	volatile uint8_t	ready;  // must be 0xAB
 } ringbuffer_t;
 
 static inline void ringbuffer_init(ringbuffer_t* buffer, uint8_t* const dataptr, const uint16_t size);
@@ -34,6 +35,7 @@ static inline void ringbuffer_init(ringbuffer_t* buffer, uint8_t* const dataptr,
 	buffer->size   = size;
 	buffer->count  = 0;
 	buffer->flag   = 0;
+	buffer->ready  = 0xAB;
 }
 
 static inline void ringbuffer_push(ringbuffer_t* buffer, const uint8_t data);

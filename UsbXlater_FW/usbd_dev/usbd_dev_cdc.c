@@ -180,8 +180,6 @@ static uint8_t  USBD_CDC_ClassInit (void* pdev, uint8_t cfgidx)
 					(uint8_t*)(USBD_CDC_H2D_Buff),
 					USBD_Dev_CDC_H2D_EP_SZ);
 
-	USBD_CDC_IsReady = 1;
-
 	return USBD_OK;
 }
 
@@ -218,6 +216,8 @@ static uint8_t  USBD_CDC_ClassDeInit (void  *pdev, uint8_t cfgidx)
  */
 static uint8_t  USBD_CDC_Setup (void  *pdev, USB_SETUP_REQ *req)
 {
+	dbgwdg_feed();
+
 	uint16_t len=USB_CDC_DESC_SIZ;
 	uint8_t  *pbuf=USBD_CDC_ConfigDescriptor + 9;
 
@@ -336,6 +336,7 @@ static uint8_t  USBD_CDC_DataIn (void *pdev, uint8_t epnum)
 		for (i = 0; i < CDC_DATA_IN_PACKET_SIZE && ringbuffer_isempty(&USBD_CDC_D2H_FIFO) == 0; i++) {
 			USBD_CDC_D2H_Buff[i] = ringbuffer_pop(&USBD_CDC_D2H_FIFO);
 		}
+		dbgwdg_feed();
 		DCD_EP_Tx (pdev,
 					USBD_Dev_CDC_D2H_EP,
 					(uint8_t*)USBD_CDC_D2H_Buff,
@@ -392,18 +393,23 @@ static uint8_t  USBD_CDC_SOF (void *pdev)
 	{
 		if (USBD_CDC_InFlight == 0)
 		{
-			if (ringbuffer_isempty(&USBD_CDC_D2H_FIFO) == 0)
+			if (USBD_CDC_D2H_FIFO.ready == 0xAB)
 			{
-				uint16_t i;
-				for (i = 0; i < CDC_DATA_IN_PACKET_SIZE && ringbuffer_isempty(&USBD_CDC_D2H_FIFO) == 0; i++) {
-					USBD_CDC_D2H_Buff[i] = ringbuffer_pop(&USBD_CDC_D2H_FIFO);
+				USBD_CDC_IsReady = 1;
+
+				if (ringbuffer_isempty(&USBD_CDC_D2H_FIFO) == 0)
+				{
+					uint16_t i;
+					for (i = 0; i < CDC_DATA_IN_PACKET_SIZE && ringbuffer_isempty(&USBD_CDC_D2H_FIFO) == 0; i++) {
+						USBD_CDC_D2H_Buff[i] = ringbuffer_pop(&USBD_CDC_D2H_FIFO);
+					}
+					DCD_EP_Tx (pdev,
+								USBD_Dev_CDC_D2H_EP,
+								(uint8_t*)USBD_CDC_D2H_Buff,
+								i);
+					USBD_CDC_InFlight = 1;
+					CdcFrameCount = 0;
 				}
-				DCD_EP_Tx (pdev,
-							USBD_Dev_CDC_D2H_EP,
-							(uint8_t*)USBD_CDC_D2H_Buff,
-							i);
-				USBD_CDC_InFlight = 1;
-				CdcFrameCount = 0;
 			}
 		}
 		else if (CdcFrameCount > 100) // timeout on waiting

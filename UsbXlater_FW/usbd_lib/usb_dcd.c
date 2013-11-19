@@ -175,7 +175,13 @@ uint32_t DCD_EP_Open(USB_OTG_CORE_HANDLE *pcore ,
   if (ep->is_in)
   {
     /* Assign a Tx FIFO */
-    ep->tx_fifo_num = ep->num;
+    /* Hack by Frank: only allow FIFO 0 and 1 to be used, 2 and 3 are not allocated, 4 doesn't exist */
+    if (ep->num > 1) {
+      ep->tx_fifo_num = 1;
+    }
+    else {
+      ep->tx_fifo_num = ep->num;
+    }
   }
   /* Set initial data PID. */
   if (ep_type == USB_OTG_EP_BULK )
@@ -265,15 +271,18 @@ uint32_t  DCD_EP_Tx ( USB_OTG_CORE_HANDLE *pcore,
 {
   USB_OTG_EP *ep;
 
-  ep = &pcore->dev.in_ep[ep_addr & 0x7F];
+  int epIdx = ep_addr & 0x7F;
+  ep = &pcore->dev.in_ep[epIdx];
 
   /* Setup and start the Transfer */
   ep->is_in = 1;
-  ep->num = ep_addr & 0x7F;
+  ep->num = epIdx;
   ep->xfer_buff = pbuf;
   ep->dma_addr = (uint32_t)pbuf;
   ep->xfer_count = 0;
   ep->xfer_len  = buf_len;
+
+  //dbg_printf(DBGMODE_DEBUG, "DCD_EP_Tx epIdx=%d, buff=0x%08X, len=%d \r\n", ep->num, ep->xfer_buff, ep->xfer_len);
 
   if ( ep->num == 0 )
   {
@@ -281,7 +290,9 @@ uint32_t  DCD_EP_Tx ( USB_OTG_CORE_HANDLE *pcore,
   }
   else
   {
+    //dbg_trace();
     USB_OTG_EPStartXfer(pcore, ep );
+    //dbg_trace();
   }
   return 0;
 }

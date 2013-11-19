@@ -10,7 +10,7 @@
 #include <usbd_lib/usb_dcd.h>
 #include <usbotg_lib/usb_regs.h>
 
-//#define ENABLE_DS3_ADDITIONAL_FEATURES
+//#define ENABLE_DS3_ADDITIONAL_FEATURES // experimental, untested, possible cheat giveaway
 
 #define USBD_Dev_DS3_D2H_EP 0x81
 #define USBD_Dev_DS3_H2D_EP 0x02
@@ -61,5 +61,6 @@ void USBD_Dev_DS3_DeviceDisconnected(void);
 
 extern USBD_Device_cb_TypeDef USBD_Dev_DS3_cb;
 extern char USBD_Host_Is_PS3;
+extern char USBD_Dev_DS3_IsActive;
 
 #endif

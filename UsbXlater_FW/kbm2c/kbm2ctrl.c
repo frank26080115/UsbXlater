@@ -22,6 +22,7 @@
 #include <math.h>
 #include <usbotg_lib/usb_core.h>
 #include <usbd_dev/usbd_dev_ds3.h>
+#include <usbd_dev/usbd_dev_ds4.h>
 #include <usbh_dev/usbh_dev_dualshock.h>
 
 extern USB_OTG_CORE_HANDLE USB_OTG_Core_dev;
@@ -37,6 +38,8 @@ ds3_packet_t ds3_packet;
 ds4_packet_t ds4_packet;
 int8_t kbm2c_leftGainIdx = 0;
 int8_t kbm2c_rightGainIdx = 0;
+const uint8_t ds4_packet_template[] = { 0x01, 0x80, 0x80, 0x80, 0x80, 0x08, 0x00, 0x00, 0x00, 0x00, 0x93, 0x5F, 0xFB, 0xD2, 0xFF, 0xDA, 0xFF, 0xD8, 0xFF, 0x4F, 0xEE, 0x14, 0x1B, 0x99, 0xFE, 0x00, 0x00, 0x00, 0x00, 0x00, 0x05, 0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x80, 0x00 };
+uint8_t ds4_rpt_cnt;
 
 // special testing utilities
 int16_t kbm2c_testOffset = 0;
@@ -169,7 +172,16 @@ void kbm2c_task(char force)
 {
 	static uint32_t lastReportTime;
 	uint32_t nowTime = systick_1ms_cnt;
-	if ((nowTime - lastReportTime) >= 10 || force != 0)
+
+	char isTime = 0;
+	if (USBD_Dev_DS4_IsActive != 0) {
+		isTime = (nowTime - lastReportTime) >= 5;
+	}
+	else {
+		isTime = (nowTime - lastReportTime) >= 10;
+	}
+
+	if (isTime != 0 || force != 0)
 	{
 		lastReportTime = nowTime;
 		if ((nowTime - kbm2c_mouseTimestamp) > 21)
@@ -188,6 +200,8 @@ void kbm2c_task(char force)
 			if (kbm2c_mouseData.y > kbm2c_config.mouse_decay) kbm2c_mouseData.y -= kbm2c_config.mouse_decay;
 			else if (kbm2c_mouseData.y < -kbm2c_config.mouse_decay) kbm2c_mouseData.y += kbm2c_config.mouse_decay;
 		}
+
+		dbgwdg_feed();
 	}
 	else {
 		return;
@@ -304,14 +318,16 @@ void kbm2c_task(char force)
 		ctrler_data.btnBits |= (1 << CTRLBTN_HOME);
 	}
 
-	if (USBH_DS4_NewData != 0)
+	if (USBD_Host_Is_PS4 == 0 && USBD_Dev_DS4_IsActive == 0)
 	{
-		// TODO decode DS4 data here
-		USBH_DS4_NewData = 0;
+		kbm2c_prepForDS3();
+		USBD_Dev_DS3_SendReport(&USB_OTG_Core_dev, (uint8_t*)&ds3_packet, sizeof(ds3_packet_t));
 	}
-
-	kbm2c_prepForDS3();
-	USBD_Dev_DS3_SendReport(&USB_OTG_Core_dev, (uint8_t*)&ds3_packet, sizeof(ds3_packet_t));
+	else
+	{
+		kbm2c_prepForDS4();
+		USBD_Dev_DS4_SendReport(&USB_OTG_Core_dev, (uint8_t*)&ds4_packet, 4*16);
+	}
 
 	memcpy(kbm2c_keyFlagsPrev, kbm2c_keyFlags, KBM2C_KEYFLAGS_SIZE * sizeof(uint32_t));
 }
@@ -328,22 +344,20 @@ void kbm2c_prepForDS3()
 
 	if (USBH_DS4_Available != 0)
 	{
-		uint8_t btnBits = USBH_DS_Buffer[5];
-		if ((btnBits & (1 << 4)) != 0) ctrler_data.btnBits |= (1 << CTRLBTN_SQR);
-		if ((btnBits & (1 << 5)) != 0) ctrler_data.btnBits |= (1 << CTRLBTN_X);
-		if ((btnBits & (1 << 6)) != 0) ctrler_data.btnBits |= (1 << CTRLBTN_CIR);
-		if ((btnBits & (1 << 7)) != 0) ctrler_data.btnBits |= (1 << CTRLBTN_TRI);
-		btnBits = USBH_DS_Buffer[6];
-		if ((btnBits & (1 << 0)) != 0) ctrler_data.btnBits |= (1 << CTRLBTN_BUMPER_LEFT);
-		if ((btnBits & (1 << 1)) != 0) ctrler_data.btnBits |= (1 << CTRLBTN_BUMPER_RIGHT);
-		if ((btnBits & (1 << 2)) != 0) ctrler_data.btnBits |= (1 << CTRLBTN_TRIGGER_LEFT);
-		if ((btnBits & (1 << 3)) != 0) ctrler_data.btnBits |= (1 << CTRLBTN_TRIGGER_RIGHT);
-		if ((btnBits & (1 << 4)) != 0) ctrler_data.btnBits |= (1 << CTRLBTN_SELECT);
-		if ((btnBits & (1 << 5)) != 0) ctrler_data.btnBits |= (1 << CTRLBTN_START);
-		if ((btnBits & (1 << 6)) != 0) ctrler_data.btnBits |= (1 << CTRLBTN_L3);
-		if ((btnBits & (1 << 7)) != 0) ctrler_data.btnBits |= (1 << CTRLBTN_R3);
-		btnBits = USBH_DS_Buffer[7];
-		if ((btnBits & (1 << 0)) != 0) ctrler_data.btnBits |= (1 << CTRLBTN_HOME);
+		uint32_t btnBits = *((uint32_t*)(&(USBH_DS_Buffer[5])));
+		if ((btnBits & (1 << DS4BTN_SQR))   != 0) ctrler_data.btnBits |= (1 << CTRLBTN_SQR);
+		if ((btnBits & (1 << DS4BTN_X))     != 0) ctrler_data.btnBits |= (1 << CTRLBTN_X);
+		if ((btnBits & (1 << DS4BTN_CIR))   != 0) ctrler_data.btnBits |= (1 << CTRLBTN_CIR);
+		if ((btnBits & (1 << DS4BTN_TRI))   != 0) ctrler_data.btnBits |= (1 << CTRLBTN_TRI);
+		if ((btnBits & (1 << DS4BTN_L1))    != 0) ctrler_data.btnBits |= (1 << CTRLBTN_BUMPER_LEFT);
+		if ((btnBits & (1 << DS4BTN_R1))    != 0) ctrler_data.btnBits |= (1 << CTRLBTN_BUMPER_RIGHT);
+		if ((btnBits & (1 << DS4BTN_L2))    != 0) ctrler_data.btnBits |= (1 << CTRLBTN_TRIGGER_LEFT);
+		if ((btnBits & (1 << DS4BTN_R2))    != 0) ctrler_data.btnBits |= (1 << CTRLBTN_TRIGGER_RIGHT);
+		if ((btnBits & (1 << DS4BTN_SHARE)) != 0) ctrler_data.btnBits |= (1 << CTRLBTN_SELECT);
+		if ((btnBits & (1 << DS4BTN_OPT))   != 0) ctrler_data.btnBits |= (1 << CTRLBTN_START);
+		if ((btnBits & (1 << DS4BTN_L3))    != 0) ctrler_data.btnBits |= (1 << CTRLBTN_L3);
+		if ((btnBits & (1 << DS4BTN_R3))    != 0) ctrler_data.btnBits |= (1 << CTRLBTN_R3);
+		if ((btnBits & (1 << DS4BTN_PS))    != 0) ctrler_data.btnBits |= (1 << CTRLBTN_HOME);
 
 		uint8_t dpad = USBH_DS_Buffer[5] & 0x0F;
 		if (dpad == 0) {
@@ -432,4 +446,159 @@ void kbm2c_prepForDS3()
 	temp += 127;
 	temp = KBM2C_CONSTRAIN(temp, 0, 255);
 	ds3_packet.stick_right_y = temp;
+}
+
+void kbm2c_prepForDS4()
+{
+	if (USBH_DS4_Available != 0) {
+		memcpy(&ds4_packet, USBH_DS_Buffer, sizeof(ds4_packet_t));
+	}
+	else {
+		memcpy(&ds4_packet, ds4_packet_template, sizeof(ds4_packet_template));
+	}
+
+	ds4_packet.report_id = 0x01;
+
+	if (USBH_DS3_Available != 0) {
+		memcpy(&ds3_packet, USBH_DS_Buffer, sizeof(ds3_packet_t));
+	}
+
+	if (USBH_DS4_Available != 0)
+	{
+		uint8_t dpad = USBH_DS_Buffer[5] & 0x0F;
+		if (dpad == 0) {
+			ctrler_data.btnBits |= (1 << CTRLBTN_DPAD_UP);
+		}
+		else if (dpad == 1) {
+			ctrler_data.btnBits |= (1 << CTRLBTN_DPAD_UP) | (1 << CTRLBTN_DPAD_RIGHT);
+		}
+		else if (dpad == 2) {
+			ctrler_data.btnBits |= (1 << CTRLBTN_DPAD_RIGHT);
+		}
+		else if (dpad == 3) {
+			ctrler_data.btnBits |= (1 << CTRLBTN_DPAD_DOWN) | (1 << CTRLBTN_DPAD_RIGHT);
+		}
+		else if (dpad == 4) {
+			ctrler_data.btnBits |= (1 << CTRLBTN_DPAD_DOWN);
+		}
+		else if (dpad == 5) {
+			ctrler_data.btnBits |= (1 << CTRLBTN_DPAD_DOWN) | (1 << CTRLBTN_DPAD_LEFT);
+		}
+		else if (dpad == 6) {
+			ctrler_data.btnBits |= (1 << CTRLBTN_DPAD_LEFT);
+		}
+		else if (dpad == 7) {
+			ctrler_data.btnBits |= (1 << CTRLBTN_DPAD_UP) | (1 << CTRLBTN_DPAD_LEFT);
+		}
+	}
+
+	// note: controller button bits will always stay the PS3 style
+	uint32_t btnBits = 0;
+	if ((ctrler_data.btnBits & (1 << CTRLBTN_SELECT)) != 0) btnBits |= (1 << DS4BTN_SHARE);
+	if ((ctrler_data.btnBits & (1 << CTRLBTN_START))  != 0) btnBits |= (1 << DS4BTN_OPT);
+	if ((ctrler_data.btnBits & (1 << CTRLBTN_L3))     != 0) btnBits |= (1 << DS4BTN_L3);
+	if ((ctrler_data.btnBits & (1 << CTRLBTN_R3))     != 0) btnBits |= (1 << DS4BTN_R3);
+	if ((ctrler_data.btnBits & (1 << CTRLBTN_BUMPER_LEFT))   != 0) btnBits |= (1 << DS4BTN_L1);
+	if ((ctrler_data.btnBits & (1 << CTRLBTN_BUMPER_RIGHT))  != 0) btnBits |= (1 << DS4BTN_R1);
+	if ((ctrler_data.btnBits & (1 << CTRLBTN_TRI)) != 0) btnBits |= (1 << DS4BTN_TRI);
+	if ((ctrler_data.btnBits & (1 << CTRLBTN_CIR)) != 0) btnBits |= (1 << DS4BTN_CIR);
+	if ((ctrler_data.btnBits & (1 << CTRLBTN_X))   != 0) btnBits |= (1 << DS4BTN_X);
+	if ((ctrler_data.btnBits & (1 << CTRLBTN_SQR)) != 0) btnBits |= (1 << DS4BTN_SQR);
+	if ((ctrler_data.btnBits & (1 << CTRLBTN_HOME)) != 0) btnBits |= (1 << DS4BTN_PS);
+
+	uint8_t dpad = (ctrler_data.btnBits & ((1 << CTRLBTN_DPAD_UP) | (1 << CTRLBTN_DPAD_RIGHT) | (1 << CTRLBTN_DPAD_DOWN) | (1 << CTRLBTN_DPAD_LEFT)));
+	switch (dpad) {
+		case (1 << CTRLBTN_DPAD_UP):
+		case (1 << CTRLBTN_DPAD_UP) | (1 << CTRLBTN_DPAD_RIGHT) | (1 << CTRLBTN_DPAD_LEFT):
+			btnBits |= 0;
+			break;
+		case (1 << CTRLBTN_DPAD_DOWN):
+		case (1 << CTRLBTN_DPAD_DOWN) | (1 << CTRLBTN_DPAD_RIGHT) | (1 << CTRLBTN_DPAD_LEFT):
+			btnBits |= 4;
+			break;
+		case (1 << CTRLBTN_DPAD_LEFT):
+		case (1 << CTRLBTN_DPAD_LEFT) | (1 << CTRLBTN_DPAD_UP) | (1 << CTRLBTN_DPAD_DOWN):
+			btnBits |= 6;
+			break;
+		case (1 << CTRLBTN_DPAD_RIGHT):
+		case (1 << CTRLBTN_DPAD_RIGHT) | (1 << CTRLBTN_DPAD_UP) | (1 << CTRLBTN_DPAD_DOWN):
+			btnBits |= 2;
+			break;
+		case (1 << CTRLBTN_DPAD_UP) | (1 << CTRLBTN_DPAD_RIGHT):
+			btnBits |= 1;
+			break;
+		case (1 << CTRLBTN_DPAD_DOWN) | (1 << CTRLBTN_DPAD_RIGHT):
+			btnBits |= 3;
+			break;
+		case (1 << CTRLBTN_DPAD_UP) | (1 << CTRLBTN_DPAD_LEFT):
+			btnBits |= 7;
+			break;
+		case (1 << CTRLBTN_DPAD_DOWN) | (1 << CTRLBTN_DPAD_LEFT):
+			btnBits |= 5;
+			break;
+		case (1 << CTRLBTN_DPAD_UP) | (1 << CTRLBTN_DPAD_DOWN):
+		case (1 << CTRLBTN_DPAD_RIGHT) | (1 << CTRLBTN_DPAD_LEFT):
+		case (1 << CTRLBTN_DPAD_UP) | (1 << CTRLBTN_DPAD_DOWN) | (1 << CTRLBTN_DPAD_RIGHT) | (1 << CTRLBTN_DPAD_LEFT):
+		case 0:
+		default:
+			btnBits |= 8;
+			break;
+	}
+
+	if ((ctrler_data.btnBits & (1 << CTRLBTN_TRIGGER_LEFT)) != 0)
+	{
+		btnBits |= (1 << DS4BTN_L2);
+		if (ds4_packet.left_trigger == 0) {
+			ds4_packet.left_trigger = 0xFF;
+		}
+	}
+	if ((ctrler_data.btnBits & (1 << CTRLBTN_TRIGGER_RIGHT)) != 0)
+	{
+		btnBits |= (1 << DS4BTN_R2);
+		if (ds4_packet.right_trigger == 0) {
+			ds4_packet.right_trigger = 0xFF;
+		}
+	}
+
+	if (USBH_DS4_Available == 0) {
+		ds4_packet.counter = (ds4_rpt_cnt << 2);
+	}
+	if ((btnBits & (1 << DS4BTN_PS)) != 0) ds4_packet.counter |= (1 << 0);
+	if ((btnBits & (1 << DS4BTN_TPAD)) != 0) ds4_packet.counter |= (1 << 1);
+	ds4_packet.btnBits &= 0xFFF0;
+	ds4_packet.btnBits |= btnBits;
+
+	int16_t temp;
+
+	kbm2c_coordCalc(&(ctrler_data.left_x), &(ctrler_data.left_y), kbm2c_config.left_stick_gain[kbm2c_leftGainIdx], kbm2c_config.left_stick_deadzone, kbm2c_config.left_stick_max, kbm2c_config.left_stick_curve);
+	kbm2c_coordCalc(&(ctrler_data.right_x), &(ctrler_data.right_y), kbm2c_config.right_stick_gain[kbm2c_rightGainIdx], kbm2c_config.right_stick_deadzone, kbm2c_config.right_stick_max, kbm2c_config.right_stick_curve);
+
+	int16_t dsFillerX, dsFillerY;
+
+	dsFillerX = (USBH_DS4_Available != 0) ? (USBH_DS_Buffer[1]) : ((USBH_DS3_Available != 0) ? USBH_DS_Buffer[3] : 0);
+	dsFillerY = (USBH_DS4_Available != 0) ? (USBH_DS_Buffer[2]) : ((USBH_DS3_Available != 0) ? USBH_DS_Buffer[4] : 0);
+	kbm2c_inactiveStickCalc(&(ctrler_data.left_x), &(ctrler_data.left_y), &(kbm2c_randomDeadZone[0]), kbm2c_config.left_stick_deadzone, dsFillerX, dsFillerY);
+
+	dsFillerX = (USBH_DS4_Available != 0) ? (USBH_DS_Buffer[3]) : ((USBH_DS3_Available != 0) ? USBH_DS_Buffer[5] : 0);
+	dsFillerY = (USBH_DS4_Available != 0) ? (USBH_DS_Buffer[4]) : ((USBH_DS3_Available != 0) ? USBH_DS_Buffer[6] : 0);
+	kbm2c_inactiveStickCalc(&(ctrler_data.right_x), &(ctrler_data.right_y), &(kbm2c_randomDeadZone[2]), kbm2c_config.right_stick_deadzone, dsFillerX, dsFillerY);
+
+	temp = lround(ctrler_data.left_x);
+	temp += 127;
+	temp = KBM2C_CONSTRAIN(temp, 0, 255);
+	ds4_packet.stick_left_x = temp;
+	temp = lround(ctrler_data.left_y);
+	temp += 127;
+	temp = KBM2C_CONSTRAIN(temp, 0, 255);
+	ds4_packet.stick_left_y = temp;
+
+	temp = lround(ctrler_data.right_x);
+	temp += 127;
+	temp += kbm2c_testOffset;
+	temp = KBM2C_CONSTRAIN(temp, 0, 255);
+	ds4_packet.stick_right_x = temp;
+	temp = lround(ctrler_data.right_y);
+	temp += 127;
+	temp = KBM2C_CONSTRAIN(temp, 0, 255);
+	ds4_packet.stick_right_y = temp;
 }

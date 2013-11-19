@@ -12,6 +12,7 @@
 #include <stdint.h>
 
 #include <cereal.h>
+#include <dbg_wdg.h>
 #include <led.h>
 #include <cmsis/swo.h>
 #include <cmsis/core_cmInstr.h>
@@ -28,7 +29,7 @@ extern uint8_t dbgmode;
 #define dbg_trace()                    do { dbg_printf(DBGMODE_SWO | DBGMODE_TRACE, "\r\ntrace: " __FILE__ " : %d\r\n", __LINE__ ); } while (0)
 #define dbg_trace_exit()               do { dbg_printf(DBGMODE_SWO | DBGMODE_TRACE, "\r\ntrace: " __FILE__ " : %d (exit)\r\n", __LINE__ ); } while (0)
 
-#define GLOBAL_TEMP_BUFF_SIZE 64
+#define GLOBAL_TEMP_BUFF_SIZE 128
 extern uint8_t global_temp_buff[GLOBAL_TEMP_BUFF_SIZE];
 
 #define DELAY_LOOPS(x) do { uint32_t _____i = (x); while (--_____i) { asm volatile ("nop"); } } while (0)
@@ -50,17 +51,16 @@ static inline void delay_us(const uint32_t x)
 	while (1);
 }
 
-extern volatile uint32_t systick_1ms_cnt;
+void jump_to_bootloader(void);
+uint16_t fletcher16(uint8_t const * data, size_t bytes);
 
+extern volatile uint32_t systick_1ms_cnt;
 extern volatile uint32_t delay_1ms_cnt;
 static inline void delay_ms(const uint32_t x)
 {
 	delay_1ms_cnt = x;
-	while (delay_1ms_cnt > 0) ;
+	while (delay_1ms_cnt > 0) dbgwdg_feed();
 }
-
-void jump_to_bootloader(void);
-uint16_t fletcher16(uint8_t const * data, size_t bytes);
 
 #ifdef  USE_FULL_ASSERT
 

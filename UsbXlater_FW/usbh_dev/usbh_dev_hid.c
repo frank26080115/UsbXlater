@@ -410,15 +410,13 @@ static USBH_Status USBH_HID_Handle(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev, u
     #ifdef USBH_HID_ENABLE_DYNAMIC_HC_ALLOC
     if (HID_Data->hc_num_in < 0)
     {
-      HID_Data->hc_num_in = USBH_Alloc_Channel(pcore, HID_Data->HIDIntInEp);
-      if (HID_Data->hc_num_in >= 0) {
-		  USBH_Open_Channel (pcore,
-							HID_Data->hc_num_in,
-							pdev->device_prop.address,
-							pdev->device_prop.speed,
-							EP_TYPE_INTR,
-							HID_Data->length);
-		}
+		USBH_Open_Channel (pcore,
+						&HID_Data->hc_num_in,
+						HID_Data->HIDIntInEp,
+						pdev->device_prop.address,
+						pdev->device_prop.speed,
+						EP_TYPE_INTR,
+						HID_Data->length);
     }
 
     if (HID_Data->hc_num_in >= 0) {
@@ -436,6 +434,8 @@ static USBH_Status USBH_HID_Handle(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev, u
 
 		  HID_Data->state = HID_POLL;
 		  HID_Data->timer = HCD_GetCurrentFrame(pcore);
+
+		  dbgwdg_feed();
       }
     #ifdef USBH_HID_ENABLE_DYNAMIC_HC_ALLOC
     }
@@ -460,8 +460,8 @@ static USBH_Status USBH_HID_Handle(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev, u
         HID_Data->start_toggle = 0;
 
         uint8_t len = pcore->host.hc[HID_Data->hc_num_in].xfer_count;
-        vcp_printf("V%04XP%04XA%dEP%02X:C%d:IntIN:", pdev->device_prop.Dev_Desc.idVendor, pdev->device_prop.Dev_Desc.idProduct, pdev->device_prop.address, HID_Data->HIDIntInEp, len);
 
+        vcp_printf("V%04XP%04XA%dEP%02X:C%d:IntIN:", pdev->device_prop.Dev_Desc.idVendor, pdev->device_prop.Dev_Desc.idProduct, pdev->device_prop.address, HID_Data->HIDIntInEp, len);
         for (uint8_t k = 0; k < len; k++) {
           vcp_printf(" 0x%02X", HID_Data->buff[k]);
         }
@@ -496,11 +496,7 @@ static USBH_Status USBH_HID_Handle(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev, u
     #ifdef USBH_HID_ENABLE_DYNAMIC_HC_ALLOC
     if (toDeallocate != 0)
     {
-      if (HID_Data->hc_num_in >= 0) {
-        USB_OTG_HC_Halt(pcore, HID_Data->hc_num_in);
-        USBH_Free_Channel(pcore, HID_Data->hc_num_in);
-        HID_Data->hc_num_in = -1;
-      }
+        USBH_Free_Channel(pcore, &HID_Data->hc_num_in);
     }
     #endif
     break;

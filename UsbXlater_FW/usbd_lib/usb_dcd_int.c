@@ -429,7 +429,6 @@ static uint32_t DCD_HandleInEP_ISR(USB_OTG_CORE_HANDLE *pcore)
   diepint.d32 = 0;
   ep_intr = USB_OTG_ReadDevAllInEPItr(pcore);
 
-  //dbg_trace(); // possible freeze
   while ( ep_intr )
   {
     if (ep_intr&0x1) /* In ITR */
@@ -501,7 +500,6 @@ static uint32_t DCD_HandleOutEP_ISR(USB_OTG_CORE_HANDLE *pcore)
   /* Read in the device interrupt bits */
   ep_intr = USB_OTG_ReadDevAllOutEp_itr(pcore);
 
-  //dbg_trace(); // possible freeze
   while ( ep_intr )
   {
     if (ep_intr&0x1)
@@ -656,9 +654,6 @@ static uint32_t DCD_WriteEmptyTxFifo(USB_OTG_CORE_HANDLE *pcore, uint32_t epnum)
   len32b = (len + 3) / 4;
   txstatus.d32 = USB_OTG_READ_REG32( &pcore->regs.INEP_REGS[epnum]->DTXFSTS);
 
-
-
-  //dbg_trace(); // possible freeze
   while  (txstatus.b.txfspcavail > len32b &&
           ep->xfer_count < ep->xfer_len &&
             ep->xfer_len != 0)

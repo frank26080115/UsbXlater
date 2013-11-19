@@ -41,11 +41,11 @@
 /* Exported macro ------------------------------------------------------------*/
 /* Exported functions ------------------------------------------------------- */
 
-void NMI_Handler(void);
+void NMI_Handler(void) __attribute__( ( naked ) );
 void HardFault_Handler(void) __attribute__( ( naked ) );
-void MemManage_Handler(void);
-void BusFault_Handler(void);
-void UsageFault_Handler(void);
+void MemManage_Handler(void) __attribute__( ( naked ) );
+void BusFault_Handler(void) __attribute__( ( naked ) );
+void UsageFault_Handler(void) __attribute__( ( naked ) );
 void SVC_Handler(void);
 void DebugMon_Handler(void);
 void PendSV_Handler(void);

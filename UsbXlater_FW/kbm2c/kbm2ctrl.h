@@ -167,6 +167,29 @@ typedef enum
 }
 ctrlbtn_t;
 
+typedef enum
+{
+	DS4BTN_DPAD0,
+	DS4BTN_DPAD1,
+	DS4BTN_DPAD2,
+	DS4BTN_DPAD3,
+	DS4BTN_SQR,
+	DS4BTN_X,
+	DS4BTN_CIR,
+	DS4BTN_TRI,
+	DS4BTN_L1,
+	DS4BTN_R1,
+	DS4BTN_L2,
+	DS4BTN_R2,
+	DS4BTN_SHARE,
+	DS4BTN_OPT,
+	DS4BTN_L3,
+	DS4BTN_R3,
+	DS4BTN_PS,
+	DS4BTN_TPAD,
+}
+ds4btn_t;
+
 typedef struct
 {
 	double left_x;
@@ -244,8 +267,10 @@ void kbm2c_handleKeyReport(uint8_t modifier, uint8_t* data, uint8_t len);
 void kbm2c_handleDs4Report(uint8_t* data);
 void kbm2c_task(char force);
 void kbm2c_prepForDS3();
+void kbm2c_prepForDS4();
 void kbm2c_coordCalc(double* xptr, double* yptr, double gain, double dz, double lim, uint8_t* curve);
 void kbm2c_deadZoneCalc(double* xptr, double* yptr, double dz);
 void kbm2c_inactiveStickCalc(double* xptr, double* yptr, int8_t* randDeadZone, uint8_t dz, int16_t fillerX, int16_t fillerY);
+kbm2c_err_t kbm2c_config_default(kbm2c_config_t* dest);
 
 #endif

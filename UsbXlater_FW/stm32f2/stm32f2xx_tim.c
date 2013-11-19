@@ -328,7 +328,7 @@ void TIM_TimeBaseInit(TIM_TypeDef* TIMx, TIM_TimeBaseInitTypeDef* TIM_TimeBaseIn
 
   /* Generate an update event to reload the Prescaler 
      and the repetition counter(only for TIM1 and TIM8) value immediatly */
-  TIMx->EGR = TIM_PSCReloadMode_Immediate;          
+  TIMx->EGR = TIM_PSCReloadMode_Immediate;
 }
 
 /**
