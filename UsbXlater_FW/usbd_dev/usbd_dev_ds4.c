@@ -8,6 +8,7 @@
 
 #include "usbd_dev_ds4.h"
 #include "usbd_dev_inc_all.h"
+#include <usbh_dev/usbh_dev_dualshock.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -393,7 +394,7 @@ uint8_t USBD_Dev_DS4_Setup(void *pcore , USB_SETUP_REQ  *req)
 		}
 		return USBD_OK;
 	}
-	else if ((req->bmRequest & USB_REQ_RECIPIENT_MASK) == USB_REQ_RECIPIENT_INTERFACE && (req->bmRequest & USB_REQ_TYPE_MASK) == USB_REQ_TYPE_CLASS && (req->bmRequest & 0x80) == 0x00 && req->bRequest == 0x01 && req->wIndex == 0)
+	else if ((req->bmRequest & USB_REQ_RECIPIENT_MASK) == USB_REQ_RECIPIENT_INTERFACE && (req->bmRequest & USB_REQ_TYPE_MASK) == USB_REQ_TYPE_CLASS && (req->bmRequest & 0x80) == 0x00 && req->bRequest == 0x09 && req->wIndex == 0)
 	{
 		if (req->wValue == 0x0312) {
 			// this we can ignore
@@ -512,13 +513,9 @@ uint8_t USBD_Dev_DS4_SendReport (USB_OTG_CORE_HANDLE *pcore,
 
 	if (pcore->dev.device_status == USB_OTG_CONFIGURED && USBD_Dev_DS4_IsActive != 0)
 	{
-		dbg_printf(DBGMODE_DEBUG, "USBD_Dev_DS4_SendReport 0x%08X %d\r\n", report, len);
-
 		dbgwdg_feed();
 
 		DCD_EP_Tx (pcore, USBD_Dev_DS4_D2H_EP, report, len);
-
-		dbg_trace();
 
 		ds4_rpt_cnt++;
 
@@ -564,6 +561,15 @@ uint8_t USBD_Dev_DS4_DataOut            (void *pcore , uint8_t epnum)
 		else if (USBD_Dev_DS_lastWValue == 0x0312)
 		{
 			// ignore
+		}
+		else if (USBD_Dev_DS_lastWValue == 0x0314)
+		{
+			if (USBD_Dev_DS_bufTemp[1] == 0x01) {
+				USBH_DS_PostedTask = USBH_DSPT_TASK_FEATURE_14_1401;
+			}
+			else if (USBD_Dev_DS_bufTemp[1] == 0x02) {
+				USBH_DS_PostedTask = USBH_DSPT_TASK_FEATURE_14_1402;
+			}
 		}
 		USBD_CtlSendStatus(pcore);
 	}

@@ -827,6 +827,7 @@ USBH_Status USBH_HandleControl (USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
     URB_Status = HCD_GetURB_State(pcore , pdev->Control.hc_num_out);
     if  (URB_Status == URB_DONE)
     { /* If the Setup Pkt is sent successful, then change the state */
+      pdev->Control.timer = HCD_GetCurrentFrame(pcore);
       pdev->Control.state = CTRL_STATUS_IN;
     }
 

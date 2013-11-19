@@ -1593,7 +1593,6 @@ USB_OTG_STS USB_OTG_EPStartXfer(USB_OTG_CORE_HANDLE *pcore , USB_OTG_EP *ep)
   /* IN endpoint */
   if (ep->is_in == 1)
   {
-    //dbg_printf(DBGMODE_DEBUG, "USB_OTG_EPStartXfer line=%d, ep->num=%d, buff=0x%08X, len=%d \r\n", __LINE__, ep->num, ep->xfer_buff, ep->xfer_len);
     depctl.d32  = USB_OTG_READ_REG32(&(pcore->regs.INEP_REGS[ep->num]->DIEPCTL));
     deptsiz.d32 = USB_OTG_READ_REG32(&(pcore->regs.INEP_REGS[ep->num]->DIEPTSIZ));
     /* Zero Length Packet? */
@@ -1612,15 +1611,12 @@ USB_OTG_STS USB_OTG_EPStartXfer(USB_OTG_CORE_HANDLE *pcore , USB_OTG_EP *ep)
       deptsiz.b.xfersize = ep->xfer_len;
       deptsiz.b.pktcnt = (ep->xfer_len - 1 + ep->maxpacket) / ep->maxpacket;
 
-      //dbg_trace();
-
       if (ep->type == EP_TYPE_ISOC)
       {
         deptsiz.b.mc = 1;
       }
     }
 
-    //dbg_trace();
     USB_OTG_WRITE_REG32(&pcore->regs.INEP_REGS[ep->num]->DIEPTSIZ, deptsiz.d32);
 
     if (pcore->cfg.dma_enable == 1)
@@ -1634,15 +1630,11 @@ USB_OTG_STS USB_OTG_EPStartXfer(USB_OTG_CORE_HANDLE *pcore , USB_OTG_EP *ep)
         /* Enable the Tx FIFO Empty Interrupt for this EP */
         if (ep->xfer_len > 0)
         {
-          //dbg_trace();
           fifoemptymsk = 1 << ep->num;
           USB_OTG_MODIFY_REG32(&pcore->regs.DREGS->DIEPEMPMSK, 0, fifoemptymsk);
-          //dbg_trace();
         }
       }
     }
-
-    //dbg_trace();
 
     if (ep->type == EP_TYPE_ISOC)
     {
@@ -1661,18 +1653,12 @@ USB_OTG_STS USB_OTG_EPStartXfer(USB_OTG_CORE_HANDLE *pcore , USB_OTG_EP *ep)
     /* EP enable, IN data in FIFO */
     depctl.b.cnak = 1;
     depctl.b.epena = 1;
-    //dbg_printf(DBGMODE_DEBUG, "USB_OTG_EPStartXfer line=%d, ep->num=%d, addr=0x%08X\r\n", __LINE__, ep->num, &pcore->regs.INEP_REGS[ep->num]->DIEPCTL);
     USB_OTG_WRITE_REG32(&pcore->regs.INEP_REGS[ep->num]->DIEPCTL, depctl.d32);
-    //dbg_trace();
 
     if (ep->type == EP_TYPE_ISOC)
     {
-      //dbg_trace();
       USB_OTG_WritePacket(pcore, ep->xfer_buff, ep->num, ep->xfer_len);
-      //dbg_trace();
     }
-
-    //dbg_trace();
   }
   else
   {

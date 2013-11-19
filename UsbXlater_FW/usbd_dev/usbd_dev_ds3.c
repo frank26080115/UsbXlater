@@ -649,8 +649,6 @@ uint8_t USBD_Dev_DS3_SendReport (USB_OTG_CORE_HANDLE *pcore,
 	{
 		dbgwdg_feed();
 
-		dbg_trace();
-
 		DCD_EP_Tx (pcore, USBD_Dev_DS3_D2H_EP, report, len);
 
 		if (repCnt > 50) {

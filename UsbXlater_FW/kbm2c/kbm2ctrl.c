@@ -173,15 +173,7 @@ void kbm2c_task(char force)
 	static uint32_t lastReportTime;
 	uint32_t nowTime = systick_1ms_cnt;
 
-	char isTime = 0;
-	if (USBD_Dev_DS4_IsActive != 0) {
-		isTime = (nowTime - lastReportTime) >= 5;
-	}
-	else {
-		isTime = (nowTime - lastReportTime) >= 10;
-	}
-
-	if (isTime != 0 || force != 0)
+	if ((nowTime - lastReportTime) >= 10 || force != 0)
 	{
 		lastReportTime = nowTime;
 		if ((nowTime - kbm2c_mouseTimestamp) > 21)

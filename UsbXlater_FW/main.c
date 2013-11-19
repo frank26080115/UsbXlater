@@ -150,10 +150,6 @@ int main(void)
 			dev_intf_state = DISTATE_CTRLER_PS4;
 		}
 
-		if ((rand() % 500) == 0) {
-			dbg_printf(DBGMODE_TRACE, "\r\n(%d)\r\n", systick_1ms_cnt);
-		}
-
 		if (systick_1ms_cnt > 999000 && USBD_Host_Is_PS3 == 0 && USBD_Host_Is_PS4 == 0 && (dev_intf_state != DISTATE_VCP && dev_intf_state != DISTATE_PASSTHROUGH))
 		{
 			dev_intf_state = DISTATE_VCP;

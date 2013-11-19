@@ -282,17 +282,13 @@ uint32_t  DCD_EP_Tx ( USB_OTG_CORE_HANDLE *pcore,
   ep->xfer_count = 0;
   ep->xfer_len  = buf_len;
 
-  //dbg_printf(DBGMODE_DEBUG, "DCD_EP_Tx epIdx=%d, buff=0x%08X, len=%d \r\n", ep->num, ep->xfer_buff, ep->xfer_len);
-
   if ( ep->num == 0 )
   {
     USB_OTG_EP0StartXfer(pcore , ep);
   }
   else
   {
-    //dbg_trace();
     USB_OTG_EPStartXfer(pcore, ep );
-    //dbg_trace();
   }
   return 0;
 }

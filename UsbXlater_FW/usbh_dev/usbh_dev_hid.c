@@ -411,7 +411,7 @@ static USBH_Status USBH_HID_Handle(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev, u
     if (HID_Data->hc_num_in < 0)
     {
 		USBH_Open_Channel (pcore,
-						&HID_Data->hc_num_in,
+						&(HID_Data->hc_num_in),
 						HID_Data->HIDIntInEp,
 						pdev->device_prop.address,
 						pdev->device_prop.speed,
@@ -496,7 +496,7 @@ static USBH_Status USBH_HID_Handle(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev, u
     #ifdef USBH_HID_ENABLE_DYNAMIC_HC_ALLOC
     if (toDeallocate != 0)
     {
-        USBH_Free_Channel(pcore, &HID_Data->hc_num_in);
+        USBH_Free_Channel(pcore, &(HID_Data->hc_num_in));
     }
     #endif
     break;

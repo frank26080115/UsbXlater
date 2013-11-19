@@ -62,32 +62,32 @@ void USBH_Dev_DefaultCB_DeInit(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 
 void USBH_Dev_DefaultCB_DeviceAttached(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 {
-	dbg_trace();
+	//dbg_trace();
 }
 
 void USBH_Dev_DefaultCB_ResetDevice(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 {
-	dbg_trace();
+	//dbg_trace();
 }
 
 void USBH_Dev_DefaultCB_DeviceDisconnected(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 {
-	dbg_trace();
+	//dbg_trace();
 }
 
 void USBH_Dev_DefaultCB_OverCurrentDetected(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 {
-	dbg_trace();
+	//dbg_trace();
 }
 
 void USBH_Dev_DefaultCB_DeviceSpeedDetected(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev, uint8_t DeviceSpeed)
 {
-	dbg_trace();
+	//dbg_trace();
 }
 
 void USBH_Dev_DefaultCB_DeviceDescAvailable(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev, void* data_)
 {
-	dbg_trace();
+	//dbg_trace();
 
 	// we do not know what type of device this is yet
 	// this is the first callback of the enumeration process
@@ -118,12 +118,12 @@ void USBH_Dev_DefaultCB_DeviceDescAvailable(USB_OTG_CORE_HANDLE *pcore , USBH_DE
 
 void USBH_Dev_DefaultCB_DeviceAddressAssigned(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 {
-	dbg_trace();
+	//dbg_trace();
 }
 
 void USBH_Dev_DefaultCB_ConfigurationDescAvailable(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev, USBH_CfgDesc_TypeDef * cfg, USBH_InterfaceDesc_TypeDef * intf, USBH_EpDesc_TypeDef ** epdesc)
 {
-	dbg_trace();
+	//dbg_trace();
 }
 
 void USBH_Dev_DefaultCB_ManufacturerString(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev, void * data_)
@@ -148,10 +148,10 @@ void USBH_Dev_DefaultCB_EnumerationDone(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *p
 
 void USBH_Dev_DefaultCB_DeviceNotSupported(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 {
-	dbg_trace();
+	//dbg_trace();
 }
 
 void USBH_Dev_DefaultCB_UnrecoveredError(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 {
-	dbg_trace();
+	//dbg_trace();
 }

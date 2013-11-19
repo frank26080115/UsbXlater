@@ -4,6 +4,15 @@
 #include <stdint.h>
 #include <usbh_lib/usbh_core.h>
 
+typedef enum {
+	USBH_DSPT_TASK_NONE,
+	USBH_DSPT_TASK_FEATURE_14_1401,
+	USBH_DSPT_TASK_FEATURE_14_1402,
+}
+USBH_DS_task_t;
+
+extern USBH_DS_task_t USBH_DS_PostedTask;
+
 extern char USBH_DS3_Available;
 extern char USBH_DS4_Available;
 extern char USBH_DS3_NewData;
