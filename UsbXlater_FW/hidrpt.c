@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-void HID_Rpt_Desc_Parse(uint8_t* desc, int length, HID_Rpt_Parsing_Params_t* parser, uint8_t intf)
+void HID_Rpt_Desc_Parse(uint8_t* desc, int length, HID_Rpt_Parsing_Params_t* parser, uint8_t intf, uint8_t* repIdList)
 {
 	int descIdx = 0;
 	int repBitIdx = 0;
@@ -14,6 +14,7 @@ void HID_Rpt_Desc_Parse(uint8_t* desc, int length, HID_Rpt_Parsing_Params_t* par
 	int8_t stackedUsagePage = -1;
 	int8_t collection = -1;
 	int8_t repId = -1;
+	int8_t repIdCnt = 0;
 	int8_t repSize = -1;
 	int8_t repCnt = -1;
 
@@ -92,6 +93,10 @@ void HID_Rpt_Desc_Parse(uint8_t* desc, int length, HID_Rpt_Parsing_Params_t* par
 				}
 
 				repBitIdx += repSize * repCnt;
+
+				if (repIdCnt < 7) {
+					repIdList[repIdCnt++] = repId;
+				}
 			}
 			else if (bTag == 0x09) {
 				// output

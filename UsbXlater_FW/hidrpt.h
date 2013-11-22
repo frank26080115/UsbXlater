@@ -33,7 +33,7 @@ typedef struct {
 }
 HID_Rpt_Parsing_Params_t;
 
-void HID_Rpt_Desc_Parse(uint8_t* desc, int length, HID_Rpt_Parsing_Params_t* parser, uint8_t intf);
+void HID_Rpt_Desc_Parse(uint8_t* desc, int length, HID_Rpt_Parsing_Params_t* parser, uint8_t intf, uint8_t* repIdList);
 void HID_Rpt_Parsing_Params_Reset(HID_Rpt_Parsing_Params_t* desc);
 void HID_Rpt_Parsing_Params_Debug_Dump(HID_Rpt_Parsing_Params_t* desc);
 

@@ -195,14 +195,14 @@ void USBH_Dev_HID_EnumerationDone(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
 
 		HID_Data->cb = malloc(sizeof(HID_cb_TypeDef));
 
-		if (pdev->device_prop.Dev_Desc.idVendor == 0x054C && pdev->device_prop.Dev_Desc.idProduct == 0x0268) {
+		if (pdev->device_prop.Dev_Desc.idVendor == SONY_VID && pdev->device_prop.Dev_Desc.idProduct == DUALSHOCK3_PID) {
 			// DUALSHOCK3
 			HID_Data->cb->Init   = USBH_DS3_Init_Handler;
 			HID_Data->cb->Decode = USBH_DS3_Decode_Handler;
 			HID_Data->cb->DeInit = USBH_DS3_DeInit_Handler;
 			dbg_printf(DBGMODE_TRACE, "Dualshock 3 Detected\r\n");
 		}
-		else if (pdev->device_prop.Dev_Desc.idVendor == 0x054C && pdev->device_prop.Dev_Desc.idProduct == 0x05C4) {
+		else if (pdev->device_prop.Dev_Desc.idVendor == SONY_VID && pdev->device_prop.Dev_Desc.idProduct == DUALSHOCK4_PID) {
 			// DUALSHOCK4
 			HID_Data->cb->Init   = USBH_DS4_Init_Handler;
 			HID_Data->cb->Decode = USBH_DS4_Decode_Handler;
@@ -294,6 +294,8 @@ void USBH_Dev_HID_EnumerationDone(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
 			continue;
 		}
 
+		uint8_t repIdList[8] = { 0, 0, 0, 0, 0, 0, 0, 0};
+
 		status = USBH_Get_HID_ReportDescriptor(pcore , pdev, i, HID_Data->HID_Desc.wItemLength);
 		if (status == USBH_OK) {
 			dbg_printf(DBGMODE_DEBUG, "USBH_Get_HID_ReportDescriptor OK: 0x%04X\r\n", status);
@@ -304,7 +306,7 @@ void USBH_Dev_HID_EnumerationDone(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
 			}
 			vcp_printf("\r\n");
 
-			HID_Rpt_Desc_Parse(pcore->host.Rx_Buffer, HID_Data->HID_Desc.wItemLength, &HID_Data->parserParams, i);
+			HID_Rpt_Desc_Parse(pcore->host.Rx_Buffer, HID_Data->HID_Desc.wItemLength, &HID_Data->parserParams, i, repIdList);
 			//dbg_printf(DBGMODE_DEBUG, "HID_Rpt_Desc_Parse Complete \r\n");
 			HID_Rep_Parsing_Params_Debug_Dump(&(HID_Data->parserParams));
 		}
@@ -314,25 +316,41 @@ void USBH_Dev_HID_EnumerationDone(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
 			continue;
 		}
 
-		status = USBH_Set_Idle (pcore, pdev, i, 0, 0);
-		if (status == USBH_OK) {
-			dbg_printf(DBGMODE_DEBUG, "USBH_Set_Idle OK: 0x%04X\r\n", status);
-		}
-		else if(status == USBH_NOT_SUPPORTED) {
-			dbg_printf(DBGMODE_DEBUG, "USBH_Set_Idle NOT SUPPORTED\r\n");
-		}
-		else {
-			dbg_printf(DBGMODE_ERR, "USBH_Set_Idle failed status: 0x%04X\r\n", status);
-			USBH_ErrorHandle(pcore, pdev, status);
+		for (int ridIdx = 0; ridIdx < 8; ridIdx++)
+		{
+			uint8_t rid = repIdList[ridIdx];
+			status = USBH_Set_Idle (pcore, pdev, i, 0, rid);
+			if (status == USBH_OK) {
+				dbg_printf(DBGMODE_DEBUG, "USBH_Set_Idle[%d] OK: 0x%04X\r\n", rid, status);
+			}
+			else if(status == USBH_NOT_SUPPORTED) {
+				dbg_printf(DBGMODE_DEBUG, "USBH_Set_Idle[%d] NOT SUPPORTED\r\n", rid);
+			}
+			else {
+				dbg_printf(DBGMODE_ERR, "USBH_Set_Idle[%d] failed status: 0x%04X\r\n", rid, status);
+				USBH_ErrorHandle(pcore, pdev, status);
+			}
+
+			// end of list
+			if (rid == 0) {
+				break;
+			}
 		}
 
-		status = USBH_Set_Protocol(pcore, pdev, i, 0); // this sets the protocol = "report"
-		if (status == USBH_OK) {
-			dbg_printf(DBGMODE_DEBUG, "USBH_Set_Protocol OK: 0x%04X\r\n", status);
+		if (pdev->device_prop.Dev_Desc.idVendor == SONY_VID && pdev->device_prop.Dev_Desc.idProduct == DUALSHOCK4_PID)
+		{
+			// TODO
 		}
-		else {
-			dbg_printf(DBGMODE_ERR, "USBH_Set_Protocol failed status: 0x%04X\r\n", status);
-			USBH_ErrorHandle(pcore, pdev, status);
+		else
+		{
+			status = USBH_Set_Protocol(pcore, pdev, i, 0); // this sets the protocol = "report"
+			if (status == USBH_OK) {
+				dbg_printf(DBGMODE_DEBUG, "USBH_Set_Protocol OK: 0x%04X\r\n", status);
+			}
+			else {
+				dbg_printf(DBGMODE_ERR, "USBH_Set_Protocol failed status: 0x%04X\r\n", status);
+				USBH_ErrorHandle(pcore, pdev, status);
+			}
 		}
 	}
 

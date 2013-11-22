@@ -4,6 +4,10 @@
 #include <stdint.h>
 #include <usbh_lib/usbh_core.h>
 
+#define SONY_VID 0x054C
+#define DUALSHOCK3_PID 0x0268
+#define DUALSHOCK4_PID 0x05C4
+
 typedef enum {
 	USBH_DSPT_TASK_NONE,
 	USBH_DSPT_TASK_FEATURE_14_1401,
