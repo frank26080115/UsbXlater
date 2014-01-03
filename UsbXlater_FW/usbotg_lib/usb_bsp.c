@@ -29,10 +29,9 @@
 /* Includes ------------------------------------------------------------------*/
 #include "usb_bsp.h"
 #include <utilities.h>
-#include <stm32f2/stm32f2xx.h>
-#include <stm32f2/stm32f2xx_rcc.h>
-#include <stm32f2/stm32f2xx_gpio.h>
-#include <stm32f2/misc.h>
+#include <stm32fx/stm32fxxx.h>
+#include <stm32fx/peripherals.h>
+#include <stm32fx/misc.h>
 
 /** @addtogroup USB_OTG_DRIVER
 * @{

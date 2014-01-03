@@ -1,0 +1,7 @@
+#ifndef COMPILE_OPTIONS_H_
+#define COMPILE_OPTIONS_H_
+
+//#define COMPILE_FOR_STM32F4
+#define COMPILE_FOR_STM32F2
+
+#endif

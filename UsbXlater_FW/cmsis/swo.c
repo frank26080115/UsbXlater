@@ -1,7 +1,7 @@
-#include <stm32f2/stm32f2xx.h>
-#include <stm32f2/misc.h>
-#include <stm32f2/stm32f2xx_dbgmcu.h>
-#include <cmsis/core_cm3.h>
+#include <stm32fx/stm32fxxx.h>
+#include <stm32fx/misc.h>
+#include <stm32fx/peripherals.h>
+#include <cmsis/core_cmx.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>

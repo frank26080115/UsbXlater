@@ -1,11 +1,9 @@
 #include "cereal.h"
 #include "ringbuffer.h"
 
-#include <stm32f2/stm32f2xx.h>
-#include <stm32f2/misc.h>
-#include <stm32f2/stm32f2xx_rcc.h>
-#include <stm32f2/stm32f2xx_gpio.h>
-#include <stm32f2/stm32f2xx_usart.h>
+#include <stm32fx/stm32fxxx.h>
+#include <stm32fx/misc.h>
+#include <stm32fx/peripherals.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,7 +12,7 @@
 static volatile ringbuffer_t cereal_incoming;
 static volatile ringbuffer_t cereal_outgoing;
 
-void cereal_init()
+void cereal_init(uint32_t baud)
 {
 	ringbuffer_init(&cereal_incoming, malloc(CEREAL_INCOMING_MAX_SIZE), CEREAL_INCOMING_MAX_SIZE);
 	#ifdef ENABLE_CEREAL_BUFFERED_TX
@@ -39,7 +37,7 @@ void cereal_init()
 
 	USART_InitTypeDef ui;
 	USART_StructInit(&ui);
-	ui.USART_BaudRate = CEREAL_BAUD_RATE;
+	ui.USART_BaudRate = baud;
 	USART_Init(CEREAL_USARTx, &ui);
 
 	USART_Cmd(CEREAL_USARTx, ENABLE);

@@ -2,10 +2,9 @@
 #include <utilities.h>
 #include <stdint.h>
 #include <misc.h>
-#include <stm32f2/stm32f2xx.h>
-#include <stm32f2/stm32f2xx_rcc.h>
-#include <stm32f2/stm32fxxx_it.h>
-#include <stm32f2/stm32f2xx_tim.h>
+#include <stm32fx/stm32fxxx.h>
+#include <stm32fx/stm32fxxx_it.h>
+#include <stm32fx/peripherals.h>
 
 #define DBGWDG_TIMx_IRQn TIM4_IRQn
 #define DBGWDG_RCC_APB1Periph_TIMx RCC_APB1Periph_TIM4

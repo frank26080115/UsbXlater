@@ -15,7 +15,7 @@
 
 #define ENABLE_CEREAL_BUFFERED_TX
 
-void cereal_init();
+void cereal_init(uint32_t baud);
 void cereal_tx(uint8_t x);
 void cereal_wait();
 void cereal_wait_tx(uint8_t x);

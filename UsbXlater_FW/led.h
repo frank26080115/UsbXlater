@@ -1,7 +1,7 @@
 #ifndef LED_H_
 #define LED_H_
 
-#include <stm32f2/stm32f2xx.h>
+#include <stm32fx/stm32fxxx.h>
 #include <stdint.h>
 
 typedef struct

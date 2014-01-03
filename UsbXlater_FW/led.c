@@ -1,8 +1,7 @@
 #include "led.h"
 
-#include <stm32f2/stm32f2xx.h>
-#include <stm32f2/stm32f2xx_gpio.h>
-#include <stm32f2/stm32f2xx_rcc.h>
+#include <stm32fx/stm32fxxx.h>
+#include <stm32fx/peripherals.h>
 
 volatile led_blink_pattern_t led_blink_pattern[4];
 

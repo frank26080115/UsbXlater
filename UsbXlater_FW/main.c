@@ -7,14 +7,12 @@
 #include <string.h>
 #include <cmsis/swo.h>
 #include <cmsis/core_cmFunc.h>
-#include <cmsis/core_cm3.h>
-#include <stm32f2/system_stm32f2xx.h>
-#include <stm32f2/stm32f2xx.h>
-#include <stm32f2/misc.h>
-#include <stm32f2/stm32fxxx_it.h>
-#include <stm32f2/stm32f2xx_rcc.h>
-#include <stm32f2/stm32f2xx_gpio.h>
-#include <stm32f2/stm32f2xx_iwdg.h>
+#include <cmsis/core_cmx.h>
+#include <stm32fx/system_stm32fxxx.h>
+#include <stm32fx/stm32fxxx.h>
+#include <stm32fx/misc.h>
+#include <stm32fx/stm32fxxx_it.h>
+#include <stm32fx/peripherals.h>
 #include <usbotg_lib/usb_core.h>
 #include <usbotg_lib/usb_bsp.h>
 #include <usbh_lib/usbh_core.h>
@@ -43,7 +41,7 @@ int main(void)
 
 	led_init();
 
-	cereal_init();
+	cereal_init(CEREAL_BAUD_RATE);
 	swo_init();
 
 	// this step determines the default output method of debug

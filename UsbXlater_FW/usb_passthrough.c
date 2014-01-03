@@ -17,7 +17,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <cmsis/core_cm3.h>
+#include <stm32fx/stm32fxxx.h>
+#include <cmsis/core_cmx.h>
 #include <cmsis/core_cmFunc.h>
 
 extern USB_OTG_CORE_HANDLE USB_OTG_Core_dev;

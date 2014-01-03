@@ -1,0 +1,10 @@
+/Release
+/Debug
+*.o.lst
+*.mk
+*.d
+*.o
+*.map
+*.lst
+*.elf
+/BuildOutput

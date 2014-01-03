@@ -3,8 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
-#include <stm32f2/stm32f2xx_syscfg.h>
-#include <stm32f2/stm32f2xx_rcc.h>
+#include <stm32fx/peripherals.h>
 #include <cmsis/core_cmFunc.h>
 
 uint8_t dbgmode = 0; // stores runtime debug level

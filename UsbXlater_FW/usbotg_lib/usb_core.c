@@ -2164,7 +2164,7 @@ void USB_OTG_SetEPStatus (USB_OTG_CORE_HANDLE *pcore , USB_OTG_EP *ep , uint32_t
 #include <usbotg_lib/usb_core.h>
 #include <usbd_lib/usb_dcd_int.h>
 #include <usbh_lib/usb_hcd_int.h>
-#include <stm32f2/stm32fxxx_it.h>
+#include <stm32fx/stm32fxxx_it.h>
 
 extern USB_OTG_CORE_HANDLE          USB_OTG_Core_dev;
 extern USB_OTG_CORE_HANDLE          USB_OTG_Core_host;

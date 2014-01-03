@@ -5,8 +5,7 @@
 #include <usbh_lib/usbh_hcs.h>
 #include <usbh_lib/usbh_ioreq.h>
 #include <usbh_lib/usbh_stdreq.h>
-#include <stm32f2/stm32f2xx_rcc.h>
-#include <stm32f2/stm32f2xx_gpio.h>
+#include <stm32fx/peripherals.h>
 #include <stdlib.h>
 #include <vcp.h>
 

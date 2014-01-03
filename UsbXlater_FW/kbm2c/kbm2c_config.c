@@ -1,7 +1,7 @@
 #include "kbm2ctrl.h"
 #include "kbm2ctrl_keycodes.h"
-#include <stm32f2xx.h>
-#include <stm32f2xx_flash.h>
+#include <stm32fx/stm32fxxx.h>
+#include <stm32fx/peripherals.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
