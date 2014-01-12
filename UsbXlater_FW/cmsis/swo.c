@@ -1,4 +1,5 @@
 #include <stm32fx/stm32fxxx.h>
+#include <stm32fx/system_stm32fxxx.h>
 #include <stm32fx/misc.h>
 #include <stm32fx/peripherals.h>
 #include <cmsis/core_cmx.h>
@@ -10,7 +11,7 @@
 void swo_init()
 {
 	uint32_t SWOSpeed = 6000000; //6000kbps, default for JLinkSWOViewer
-	uint32_t SWOPrescaler = (120000000 / SWOSpeed) - 1; // SWOSpeed in Hz
+	uint32_t SWOPrescaler = (SystemCoreClock / SWOSpeed) - 1; // SWOSpeed in Hz
 	CoreDebug->DEMCR = CoreDebug_DEMCR_TRCENA_Msk;
 	DBGMCU->CR = DBGMCU_CR_TRACE_IOEN | DBGMCU_CR_DBG_STANDBY | DBGMCU_CR_DBG_STOP | DBGMCU_CR_DBG_SLEEP;
 	*((volatile unsigned *)(ITM_BASE + 0x400F0)) = 0x00000002; // "Selected PIN Protocol Register": Select which protocol to use for trace output (2: SWO)
