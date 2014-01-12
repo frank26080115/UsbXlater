@@ -6,7 +6,7 @@
 #define PERFORM_CRC_TEST
 
 extern uint32_t (*crc32_prefered)(uint8_t*, int);
-void crc32_reset();
+void crc_reset();
 void crc_init();
 
 #endif

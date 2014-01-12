@@ -1,5 +1,6 @@
 #include "utilities.h"
 #include "crc.h"
+#include <cmsis/core_cmInstr.h>
 #include <stm32fx/stm32fxxx.h>
 #include <stm32fx/peripherals.h>
 
@@ -55,6 +56,15 @@ static const uint8_t crc32_test_data[CRC32_TEST_SIZE + 1] = {
 	0xA1, 0x11, 0xC0, 0x00, 0x83, 0x81, 0x7E, 0x7E, 0x08, 0x00, 0x3C, 0x00, 0x00, 0x83, 0xA2, 0x07, 0xF1, 0xFF, 0xF9, 0xFF, 0x04, 0x00, 0x21, 0x03, 0x17, 0x1F, 0x29, 0xF9, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00
 };
 
+void crc_reset()
+{
+	CRC->CR = CRC_CR_RESET;
+	__NOP();
+	__NOP();
+	__NOP();
+	__NOP();
+}
+
 uint32_t crc32_continued(uint32_t crc_in, uint8_t* data, int len)
 {
 	uint32_t crc = crc_in ^ ~0U;
@@ -68,99 +78,26 @@ uint32_t crc32_continued(uint32_t crc_in, uint8_t* data, int len)
 
 uint32_t crc32_accelerated(uint8_t* data, int len)
 {
-	int i;
-	int len32 = len - (len % 4);
-	for (i = 0; i < len32; i += 4)
-	{
-		uint32_t* d32 = &data[i];
-		CRC->DR = (*d32);
-	}
-	return crc32_continued(CRC->DR, &data[i], len - i);
-}
-
-uint32_t crc32_accelerated2(uint8_t* data, int len)
-{
-	int i;
-	int len32 = len - (len % 4);
-	for (i = 0; i < len32; i += 4)
-	{
-		uint32_t* d32 = &data[i];
-		CRC->DR = (*d32);
-	}
-	return crc32_continued(__builtin_bswap32(CRC->DR), &data[i], len - i);
-}
-
-uint32_t crc32_accelerated_padded(uint8_t* data, int len)
-{
-	for (int i = 0; i < len; i++)
-	{
-		uint32_t d = data[i] & 0xFF;
-		CRC->DR = d;
-	}
-	return CRC->DR;
-}
-
-uint32_t crc32_accelerated_rev(uint8_t* data, int len)
-{
+	crc_reset();
 	int i;
 	int len32 = len - (len % 4);
 	for (i = 0; i < len32; i += 4)
 	{
 		uint32_t* d32p = &data[i];
 		uint32_t d32 = *d32p;
-		CRC->DR = __builtin_bswap32(d32);
+		CRC->DR = __RBIT(d32);
 	}
-	return crc32_continued(CRC->DR, &data[i], len - i);
+	__NOP();__NOP();__NOP();
+	uint32_t res = CRC->DR;
+	return crc32_continued(__RBIT(res) ^ ~0U, &data[i], len - i);
 }
-
-uint32_t crc32_accelerated_rev2(uint8_t* data, int len)
-{
-	int i;
-	int len32 = len - (len % 4);
-	for (i = 0; i < len32; i += 4)
-	{
-		uint32_t* d32p = &data[i];
-		uint32_t d32 = *d32p;
-		CRC->DR = __builtin_bswap32(d32);
-	}
-	return crc32_continued(__builtin_bswap32(CRC->DR), &data[i], len - i);
-}
-
-uint32_t crc32_accelerated_rev_padded(uint8_t* data, int len)
-{
-	for (int i = 0; i < len; i++)
-	{
-		uint32_t d = data[i] & 0xFF;
-		CRC->DR = __builtin_bswap32(d);
-	}
-	return CRC->DR;
-}
-
 uint32_t crc32_slow(uint8_t* data, int len)
 {
-	return crc32_continued(0, data, len);
+	uint32_t i = crc32_continued(0, data, 72);
+	return crc32_continued(i, &data[72], 3);
 }
 
 uint32_t (*crc32_prefered)(uint8_t*, int);
-
-void crc32_reset()
-{
-	CRC->CR = CRC_CR_RESET;
-	__NOP();
-	__NOP();
-	__NOP();
-	__NOP();
-#ifdef REQUIRE_CRC_DR_0
-	while (CRC->DR != 0)
-	{
-		CRC->DR = 0xFFFFFFFF;
-		__NOP();
-		__NOP();
-		__NOP();
-		__NOP();
-	}
-#endif
-}
 
 void crc_init()
 {
@@ -181,64 +118,8 @@ void crc_init()
 		dbg_printf(DBGMODE_DEBUG, "FAILED\r\n");
 	}
 
-	crc32_reset();
-	res = crc32_accelerated_padded(crc32_test_data, CRC32_TEST_SIZE);
-	dbg_printf(DBGMODE_DEBUG, "CRC32 test crc32_accelerated_padded, result = 0x%08X, ", res);
-	if (res == CRC32_TEST_RESULT) {
-		dbg_printf(DBGMODE_DEBUG, "PASSED\r\n");
-		crc32_prefered = crc32_accelerated_padded;
-	}
-	else {
-		dbg_printf(DBGMODE_DEBUG, "FAILED\r\n");
-	}
-
-	crc32_reset();
 	res = crc32_accelerated(crc32_test_data, CRC32_TEST_SIZE);
 	dbg_printf(DBGMODE_DEBUG, "CRC32 test crc32_accelerated, result = 0x%08X, ", res);
-	if (res == CRC32_TEST_RESULT) {
-		dbg_printf(DBGMODE_DEBUG, "PASSED\r\n");
-		crc32_prefered = crc32_accelerated;
-	}
-	else {
-		dbg_printf(DBGMODE_DEBUG, "FAILED\r\n");
-	}
-
-	crc32_reset();
-	res = crc32_accelerated2(crc32_test_data, CRC32_TEST_SIZE);
-	dbg_printf(DBGMODE_DEBUG, "CRC32 test crc32_accelerated2, result = 0x%08X, ", res);
-	if (res == CRC32_TEST_RESULT) {
-		dbg_printf(DBGMODE_DEBUG, "PASSED\r\n");
-		crc32_prefered = crc32_accelerated;
-	}
-	else {
-		dbg_printf(DBGMODE_DEBUG, "FAILED\r\n");
-	}
-
-	crc32_reset();
-	res = crc32_accelerated_rev_padded(crc32_test_data, CRC32_TEST_SIZE);
-	dbg_printf(DBGMODE_DEBUG, "CRC32 test crc32_accelerated_rev_padded, result = 0x%08X, ", res);
-	if (res == CRC32_TEST_RESULT) {
-		dbg_printf(DBGMODE_DEBUG, "PASSED\r\n");
-		crc32_prefered = crc32_accelerated_padded;
-	}
-	else {
-		dbg_printf(DBGMODE_DEBUG, "FAILED\r\n");
-	}
-
-	crc32_reset();
-	res = crc32_accelerated_rev(crc32_test_data, CRC32_TEST_SIZE);
-	dbg_printf(DBGMODE_DEBUG, "CRC32 test crc32_accelerated_rev, result = 0x%08X, ", res);
-	if (res == CRC32_TEST_RESULT) {
-		dbg_printf(DBGMODE_DEBUG, "PASSED\r\n");
-		crc32_prefered = crc32_accelerated;
-	}
-	else {
-		dbg_printf(DBGMODE_DEBUG, "FAILED\r\n");
-	}
-
-	crc32_reset();
-	res = crc32_accelerated_rev2(crc32_test_data, CRC32_TEST_SIZE);
-	dbg_printf(DBGMODE_DEBUG, "CRC32 test crc32_accelerated_rev2, result = 0x%08X, ", res);
 	if (res == CRC32_TEST_RESULT) {
 		dbg_printf(DBGMODE_DEBUG, "PASSED\r\n");
 		crc32_prefered = crc32_accelerated;
