@@ -2,6 +2,7 @@
 #define usbh_dev_hid_h
 
 #include <usbh_lib/usbh_core.h>
+#include <stdint.h>
 #include <hidrpt.h>
 
 void USBH_Dev_HID_DeInitDev(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev);
@@ -23,6 +24,22 @@ void USBH_Dev_HID_UnrecoveredError(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev);
 
 void HID_Init_Default_Handler(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev, uint8_t intf);
 void HID_Decode_Default_Handler(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev, uint8_t intf, uint8_t ep, uint8_t* data, uint8_t len);
+
+USBH_Status USBH_Get_Report (USB_OTG_CORE_HANDLE *pcore,
+                                 USBH_DEV *pdev,
+                                    uint8_t intf,
+                                    uint8_t reportType,
+                                    uint8_t reportId,
+                                    uint8_t reportLen,
+                                    uint8_t* reportBuff);
+
+USBH_Status USBH_Set_Report (USB_OTG_CORE_HANDLE *pcore,
+                                 USBH_DEV *pdev,
+                                    uint8_t intf,
+                                    uint8_t reportType,
+                                    uint8_t reportId,
+                                    uint8_t reportLen,
+                                    uint8_t* reportBuff);
 
 extern USBH_Device_cb_TypeDef USBH_Dev_CB_HID;
 

@@ -486,6 +486,8 @@ static USBH_Status USBH_HID_Handle(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev, u
         vcp_printf("\r\n");
 
         HID_Data->cb->Decode(pcore, pdev, intf, HID_Data->HIDIntInEp, HID_Data->buff, len);
+
+        HID_Data->state = HID_GET_DATA;
         toDeallocate = 1;
       }
     }
@@ -607,6 +609,28 @@ USBH_Status USBH_Set_Report (USB_OTG_CORE_HANDLE *pcore,
 
 
   pdev->Control.setup.b.bRequest = USB_HID_SET_REPORT;
+  pdev->Control.setup.b.wValue.w = (reportType << 8 ) | reportId;
+
+  pdev->Control.setup.b.wIndex.w = intf;
+  pdev->Control.setup.b.wLength.w = reportLen;
+
+  return USBH_CtlReq_Blocking(pcore, pdev, reportBuff , reportLen , 200);
+}
+
+USBH_Status USBH_Get_Report (USB_OTG_CORE_HANDLE *pcore,
+                                 USBH_DEV *pdev,
+                                    uint8_t intf,
+                                    uint8_t reportType,
+                                    uint8_t reportId,
+                                    uint8_t reportLen,
+                                    uint8_t* reportBuff)
+{
+
+  pdev->Control.setup.b.bmRequestType = USB_D2H | USB_REQ_RECIPIENT_INTERFACE |\
+    USB_REQ_TYPE_CLASS;
+
+
+  pdev->Control.setup.b.bRequest = USB_HID_REQ_GET_REPORT;
   pdev->Control.setup.b.wValue.w = (reportType << 8 ) | reportId;
 
   pdev->Control.setup.b.wIndex.w = intf;

@@ -25,6 +25,7 @@ USBH_Device_cb_TypeDef USBH_Dev_CB_Default = {
 
 extern USBH_Device_cb_TypeDef USBH_Dev_HID_CB;
 extern USBH_Device_cb_TypeDef USBH_Dev_Hub_CB;
+extern USBH_Device_cb_TypeDef USBH_Dev_BtHci_CB;
 
 void USBH_Dev_DefaultCB_DeInitDev(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 {
@@ -106,6 +107,18 @@ void USBH_Dev_DefaultCB_DeviceDescAvailable(USB_OTG_CORE_HANDLE *pcore , USBH_DE
 			pdev->cb = &USBH_Dev_Hub_CB;
 			dbg_printf(DBGMODE_TRACE, "USBH_Dev_DefaultCB_DeviceDescAvailable Found Hub 0x%02X\r\n", pdev->device_prop.Dev_Desc.bDeviceClass);
 			break;
+		case 0xE0:
+			// Wireless Controller
+			if (pdev->device_prop.Dev_Desc.bDeviceSubClass == 0x01)
+			{
+				// RF Controller
+				if (pdev->device_prop.Dev_Desc.bDeviceProtocol == 0x01) {
+					// Bluetooth
+					pdev->cb = &USBH_Dev_BtHci_CB;
+					dbg_printf(DBGMODE_TRACE, "USBH_Dev_DefaultCB_DeviceDescAvailable Found Bluetooth Dongle\r\n");
+					break;
+				}
+			}
 		case 0x08:
 			// mass storage
 			// fall through
