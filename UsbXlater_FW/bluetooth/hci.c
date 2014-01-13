@@ -37,7 +37,6 @@ void HCI_HandleEvent(BTHCI_t* bthci, uint8_t* data)
 		{
 			case HCI_CMD_READBDADDR:
 				bd_addr = &data[6];
-				bthci->dongle_bdaddr;
 				memcpy(bthci->dongle_bdaddr, bd_addr, 6);
 				flashfile_cacheFlush();
 				nvm_file_t* f = (nvm_file_t*)flashfilesystem.cache;
@@ -47,6 +46,7 @@ void HCI_HandleEvent(BTHCI_t* bthci, uint8_t* data)
 					flashfilesystem.cache_dirty = 1;
 				}
 				flashfile_cacheFlush();
+				dbg_printf(DBGMODE_DEBUG, "HCI_CMD_READBDADDR %s\r\n", print_bdaddr(bthci->dongle_bdaddr));
 				break;
 		}
 
@@ -147,11 +147,11 @@ void HCI_HandleEvent(BTHCI_t* bthci, uint8_t* data)
 			dbg_printf(DBGMODE_ERR, "HCI Command Complete Error, ");
 			if (status != HCI_COMMANDSTATUS_SUCCESS)
 			{
-				dbg_printf(DBGMODE_ERR, "status = 0x%02X, ");
+				dbg_printf(DBGMODE_ERR, "status = 0x%02X, ", status);
 			}
-			if (cmd == bthci->last_cmd)
+			if (cmd != bthci->last_cmd)
 			{
-				dbg_printf(DBGMODE_ERR, "cmd 0x%04X == bthci->last_cmd 0x%04X, ", cmd, bthci->last_cmd);
+				dbg_printf(DBGMODE_ERR, "cmd 0x%04X != bthci->last_cmd 0x%04X, ", cmd, bthci->last_cmd);
 			}
 		}
 	}
@@ -447,12 +447,13 @@ char HCI_Command(BTHCI_t* bthci, uint16_t opcode, uint8_t* params, uint8_t len)
 	{
 		dbg_printf(DBGMODE_TRACE, "HCI_Command via USB, opcode 0x%04X, length %d\r\n", opcode, len);
 
-		for (int i = len + 1; i >= 2; i--) {
-			params[i] = params[i - 2];
+		for (int i = len + 2; i >= 3; i--) {
+			params[i] = params[i - 3];
 		}
 		uint16_t* opcode_ptr = (uint16_t*)params;
 		*opcode_ptr = opcode;
-		USBH_Status status = USBH_Dev_BtHci_Command(bthci->usb_core, bthci->usbh_dev, params, len + 2);
+		params[2] = len;
+		USBH_Status status = USBH_Dev_BtHci_Command(bthci->usb_core, bthci->usbh_dev, params, len + 3);
 		if (status == USBH_OK) {
 			return 0;
 		}

@@ -33,14 +33,12 @@ USBH_Device_cb_TypeDef USBH_Dev_BtHci_CB = {
 
 void USBH_Dev_BtHci_Handle_InterruptIn(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev, void* data_)
 {
-	dbg_trace();
 	UsbHci_Data_t* UsbHci_Data = pdev->Usr_Data;
 	HCI_HandleEvent(&UsbHci_Data->bthci, (uint8_t*)data_);
 }
 
 void USBH_Dev_BtHci_Handle_BulkIn(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev, void* data_)
 {
-	dbg_trace();
 	UsbHci_Data_t* UsbHci_Data = pdev->Usr_Data;
 	HCI_HandleData(&UsbHci_Data->bthci, (uint8_t*)data_);
 }
@@ -71,8 +69,8 @@ USBH_Status USBH_Dev_BtHci_Task(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
   case UsbHciState_IDLE:
 
     UsbHci_Data->state = UsbHciState_SYNC;
-    //USBH_Free_Channel(pcore, &(pdev->Control.hc_num_in));
-    //USBH_Free_Channel(pcore, &(pdev->Control.hc_num_out));
+    USBH_Free_Channel(pcore, &(pdev->Control.hc_num_in));
+    USBH_Free_Channel(pcore, &(pdev->Control.hc_num_out));
 
   case UsbHciState_SYNC:
 
@@ -98,7 +96,7 @@ USBH_Status USBH_Dev_BtHci_Task(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 								pdev->device_prop.address,
 								pdev->device_prop.speed,
 								EP_TYPE_INTR,
-								UsbHci_Data->length);
+								UsbHci_Data->intInLen);
 		}
 	}
 	else
@@ -110,7 +108,7 @@ USBH_Status USBH_Dev_BtHci_Task(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 								pdev->device_prop.address,
 								pdev->device_prop.speed,
 								EP_TYPE_BULK,
-								UsbHci_Data->length);
+								UsbHci_Data->bulkInLen);
 		}
 	}
 
@@ -285,6 +283,10 @@ void USBH_Dev_BtHci_EnumerationDone(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 	UsbHci_Data->hc_num_bulkout = -1;
 	UsbHci_Data->hc_num_intin = -1;
 
+	UsbHci_Data->intInLen = 16;
+	UsbHci_Data->bulkInLen = 64;
+	UsbHci_Data->bulkOutLen = 64;
+
 #ifndef USBHCI_ENABLE_DYNAMIC_HC_ALLOC
 	if (USBH_Open_Channel  (pcore,
 							&(UsbHci_Data->hc_num_intin),
@@ -292,7 +294,7 @@ void USBH_Dev_BtHci_EnumerationDone(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 							pdev->device_prop.address,
 							pdev->device_prop.speed,
 							EP_TYPE_INTR,
-							UsbHci_Data->length) != HC_OK)
+							UsbHci_Data->intInLen) != HC_OK)
 	{
 		dbg_printf(DBGMODE_ERR, "Unable to open inter-in-EP for USB BT HCI\r\n");
 	}
@@ -302,7 +304,7 @@ void USBH_Dev_BtHci_EnumerationDone(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 							pdev->device_prop.address,
 							pdev->device_prop.speed,
 							EP_TYPE_BULK,
-							UsbHci_Data->length) != HC_OK)
+							UsbHci_Data->bulkInLen) != HC_OK)
 	{
 		dbg_printf(DBGMODE_ERR, "Unable to open bulk-in-EP for USB BT HCI\r\n");
 	}
@@ -313,7 +315,7 @@ void USBH_Dev_BtHci_EnumerationDone(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 							pdev->device_prop.address,
 							pdev->device_prop.speed,
 							EP_TYPE_BULK,
-							UsbHci_Data->length) != HC_OK)
+							UsbHci_Data->bulkOutLen) != HC_OK)
 	{
 		dbg_printf(DBGMODE_ERR, "Unable to open bulk-out-EP for USB BT HCI\r\n");
 	}
@@ -398,7 +400,7 @@ USBH_Status USBH_Dev_BtHci_TxData(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev, u
 								pdev->device_prop.address,
 								pdev->device_prop.speed,
 								EP_TYPE_BULK,
-								UsbHci_Data->length) != HC_OK)
+								UsbHci_Data->bulkOutLen) != HC_OK)
 		{
 			dbg_printf(DBGMODE_ERR, "Unable to open bulk-out-EP for USB BT HCI\r\n");
 		}

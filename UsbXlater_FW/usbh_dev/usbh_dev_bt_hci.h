@@ -52,7 +52,9 @@ typedef struct
 	uint8_t              intInEp;
 	uint8_t              bulkOutEp;
 	uint8_t              bulkInEp;
-	uint16_t             length;
+	uint16_t             bulkInLen;
+	uint16_t             bulkOutLen;
+	uint16_t             intInLen;
 	uint8_t              ep_addr;
 	uint16_t             poll;
 	__IO uint16_t        timer;
