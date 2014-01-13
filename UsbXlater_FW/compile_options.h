@@ -1,7 +1,11 @@
 #ifndef COMPILE_OPTIONS_H_
 #define COMPILE_OPTIONS_H_
 
-//#define COMPILE_FOR_STM32F4
-#define COMPILE_FOR_STM32F2
+#define COMPILE_FOR_STM32F4
+//#define COMPILE_FOR_STM32F2
+
+#define HUB_HAS_RESET
+
+#define USE_FULL_ASSERT 1
 
 #endif

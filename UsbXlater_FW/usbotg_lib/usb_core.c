@@ -262,6 +262,8 @@ USB_OTG_STS USB_OTG_SelectCore(USB_OTG_CORE_HANDLE *pcore,
 #else
 #ifdef USB_OTG_EMBEDDED_PHY_ENABLED
     pcore->cfg.phy_itface       = USB_OTG_EMBEDDED_PHY;
+#else
+#error pcore->cfg.phy_itface unknown
 #endif
 #endif
 

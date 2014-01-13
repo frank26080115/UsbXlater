@@ -373,13 +373,15 @@ int flashfile_writeNvmFile(nvm_file_t* data)
 	uint32_t crc = crc32_prefered((uint8_t*)data, sizeof(nvm_file_t) - sizeof(uint32_t));
 	data->crc = crc;
 
-	mru_t old_mru = *flashfilesystem.mru;
+	mru_t old_mru = 1;
 
 	// find the next available space, must be blank
 	uint32_t found = 0;
 
 	if ((int)flashfilesystem.mru >= (FLASHFILE_PAGE_START + sizeof(nvm_file_t)) && (int)flashfilesystem.mru <= FLASHFILE_PAGE_END)
 	{
+		old_mru = *flashfilesystem.mru;
+
 		for (uint32_t i = (int)flashfilesystem.mru; i < FLASHFILE_PAGE_END - sizeof(nvm_file_t) - sizeof(mru_t); i++)
 		{
 			// check if memory region required is blank
@@ -408,8 +410,8 @@ int flashfile_writeNvmFile(nvm_file_t* data)
 
 	if (found == 0)
 	{
-		// no more room, we need to erase and relocate to the top of the sector
-		dbg_printf(DBGMODE_DEBUG, "flashfile_writeNvmFile no more blank room, starting from sector top\r\n");
+		// we need to erase and relocate to the top of the sector
+		dbg_printf(DBGMODE_DEBUG, "flashfile_writeNvmFile starting from sector top\r\n");
 
 		retry = busyRetry = 0;
 		do

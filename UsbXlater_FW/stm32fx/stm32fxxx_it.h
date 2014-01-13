@@ -50,6 +50,8 @@ void SVC_Handler(void);
 void DebugMon_Handler(void);
 void PendSV_Handler(void);
 void SysTick_Handler(void);
+void Default_Handler_C(void);
+void UnknownVector_Handler(void);
 
 #ifdef __cplusplus
 }

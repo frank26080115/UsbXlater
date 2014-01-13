@@ -34,10 +34,7 @@ extern volatile uint8_t USBH_Dev_Reset_Timer;
 
 void USB_Hub_Hardware_Init()
 {
-	// function is stubbed, new 20131021 circuit does not have an integrated hub
-	// and thus there is no good way to perform a hardware reset
-	return;
-
+#ifdef HUB_HAS_RESET
 	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
 	GPIO_InitTypeDef gi;
 	GPIO_StructInit(&gi);
@@ -46,17 +43,16 @@ void USB_Hub_Hardware_Init()
 	gi.GPIO_OType = GPIO_OType_PP;
 	gi.GPIO_Speed = GPIO_Speed_2MHz;
 	GPIO_Init(GPIOA, &gi);
+#endif
 }
 
 void USB_Hub_Hardware_Reset()
 {
-	// function is stubbed, new 20131021 circuit does not have an integrated hub
-	// and thus there is no good way to perform a hardware reset
-	return;
-
+#ifdef HUB_HAS_RESET
 	GPIO_WriteBit(GPIOA, GPIO_Pin_15, Bit_RESET);
 	delay_us(200);
 	GPIO_WriteBit(GPIOA, GPIO_Pin_15, Bit_SET);
+#endif
 }
 
 void USBH_Dev_Hub_Handle_InterruptIn(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev, void* data_)
@@ -306,7 +302,7 @@ USBH_Status USBH_Dev_Hub_Task(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
     }
     else {
       dbg_printf(DBGMODE_ERR, "Unable to allocate channel for hub (addr %d) \r\n", pdev->device_prop.address);
-      Hub_Data->hc_num_in = 0;
+      Hub_Data->hc_num_in = -1;
     }
     #endif
     break;

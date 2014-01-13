@@ -9,6 +9,7 @@
 #include "usbd_dev_ds4.h"
 #include "usbd_dev_inc_all.h"
 #include <usbh_dev/usbh_dev_dualshock.h>
+#include <flashfile.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -19,7 +20,7 @@ const uint8_t USBD_DEV_DS4_Feature_A3[USBD_DEV_DS4_Feature_A3_SIZE] = { 0xA3, 0x
 const uint8_t USBD_DEV_DS4_Feature_02[USBD_DEV_DS4_Feature_02_SIZE] = { 0x02, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x87, 0x22, 0x7B, 0xDD, 0xB2, 0x22, 0x47, 0xDD, 0xBD, 0x22, 0x43, 0xDD, 0x1C, 0x02, 0x1C, 0x02, 0x7F, 0x1E, 0x2E, 0xDF, 0x60, 0x1F, 0x4C, 0xE0, 0x3A, 0x1D, 0xC6, 0xDE, 0x08, 0x00 };
 
 #define USBD_DEV_DS4_Feature_12_SIZE 16
-const uint8_t USBD_DEV_DS4_Feature_12[USBD_DEV_DS4_Feature_12_SIZE] = { 0x12, 0x8B, 0x09, 0x07, 0x6D, 0x66, 0x1C, 0x08, 0x25, 0x00, 0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC };
+const uint8_t USBD_DEV_DS4_Feature_12[USBD_DEV_DS4_Feature_12_SIZE] = { 0x12, 0x8B, 0x09, 0x07, 0x6D, 0x66, 0x1C, 0x08, 0x25, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
 
 #define USBD_Dev_DS4_DeviceDescriptor_SIZE 18
 const uint8_t USBD_Dev_DS4_DeviceDescriptor[USBD_Dev_DS4_DeviceDescriptor_SIZE] = {
@@ -372,20 +373,24 @@ uint8_t USBD_Dev_DS4_Setup(void *pcore , USB_SETUP_REQ  *req)
 	uint16_t len = 0;
 	uint8_t  *pbuf = NULL;
 
-	if ((req->bmRequest & USB_REQ_RECIPIENT_MASK) == USB_REQ_RECIPIENT_INTERFACE && (req->bmRequest & USB_REQ_TYPE_MASK) == USB_REQ_TYPE_CLASS && (req->bmRequest & 0x80) == 0x80 && req->bRequest == 0x01 && req->wIndex == 0)
+	if ((req->bmRequest & USB_REQ_RECIPIENT_MASK) == USB_REQ_RECIPIENT_INTERFACE && (req->bmRequest & USB_REQ_TYPE_MASK) == USB_REQ_TYPE_CLASS && (req->bmRequest & 0x80) == USB_D2H && req->bRequest == 0x01 && req->wIndex == 0)
 	{
 		if (req->wValue == 0x0302) {
 			USBD_Host_Is_PS4 = 1;
-			USBD_CtlSendData (pcore, (uint8_t *)USBD_DEV_DS4_Feature_02, req->wLength);
+			USBD_Dev_DS_bufTemp[0] = 0x02;
+			memcpy(&USBD_Dev_DS_bufTemp[1], flashfilesystem.nvm_file->d.fmt.report_02, req->wLength - 1);
+			USBD_CtlSendData (pcore, (uint8_t *)USBD_Dev_DS_bufTemp, req->wLength);
 		}
 		else if (req->wValue == 0x03A3) {
 			USBD_Host_Is_PS4 = 1;
-			USBD_CtlSendData (pcore, (uint8_t *)USBD_DEV_DS4_Feature_A3, req->wLength);
+			USBD_Dev_DS_bufTemp[0] = 0xA3;
+			memcpy(&USBD_Dev_DS_bufTemp[1], flashfilesystem.nvm_file->d.fmt.report_a3, req->wLength - 1);
+			USBD_CtlSendData (pcore, (uint8_t *)USBD_Dev_DS_bufTemp, req->wLength);
 		}
 		else if (req->wValue == 0x0312) {
 			USBD_Host_Is_PS4 = 1;
-			memcpy(USBD_Dev_DS_bufTemp, USBD_DEV_DS4_Feature_12, req->wLength);
-			memcpy(&(USBD_Dev_DS_bufTemp[USBD_DEV_DS4_Feature_12_SIZE - 1 - 6]), USBD_Dev_DS_masterBdaddr, 6);
+			USBD_Dev_DS_bufTemp[0] = 0x12;
+			memcpy(&USBD_Dev_DS_bufTemp[1], flashfilesystem.nvm_file->d.fmt.report_12, req->wLength - 1);
 			USBD_CtlSendData (pcore, (uint8_t *)USBD_Dev_DS_bufTemp, req->wLength);
 		}
 		else {
@@ -394,7 +399,7 @@ uint8_t USBD_Dev_DS4_Setup(void *pcore , USB_SETUP_REQ  *req)
 		}
 		return USBD_OK;
 	}
-	else if ((req->bmRequest & USB_REQ_RECIPIENT_MASK) == USB_REQ_RECIPIENT_INTERFACE && (req->bmRequest & USB_REQ_TYPE_MASK) == USB_REQ_TYPE_CLASS && (req->bmRequest & 0x80) == 0x00 && req->bRequest == 0x09 && req->wIndex == 0)
+	else if ((req->bmRequest & USB_REQ_RECIPIENT_MASK) == USB_REQ_RECIPIENT_INTERFACE && (req->bmRequest & USB_REQ_TYPE_MASK) == USB_REQ_TYPE_CLASS && (req->bmRequest & 0x80) == USB_H2D && req->bRequest == 0x09 && req->wIndex == 0)
 	{
 		if (req->wValue == 0x0312) {
 			// this we can ignore
@@ -556,11 +561,18 @@ uint8_t USBD_Dev_DS4_DataOut            (void *pcore , uint8_t epnum)
 	{
 		if (USBD_Dev_DS_lastWValue == 0x0313)
 		{
-			memcpy(USBD_Dev_DS_masterBdaddr, &(USBD_Dev_DS_bufTemp[1]), 6);
+			nvm_file_t* f = &flashfilesystem.cache;
+			memcpy(f->d.fmt.report_13, &(USBD_Dev_DS_bufTemp[1]), 6 + 8 + 8);
+			flashfilesystem.cache_dirty = 1;
+			flashfile_cacheFlush();
 		}
 		else if (USBD_Dev_DS_lastWValue == 0x0312)
 		{
-			// ignore
+			// this event doesn't happen but it can theoretically happen
+			nvm_file_t* f = &flashfilesystem.cache;
+			memcpy(f->d.fmt.report_12, &(USBD_Dev_DS_bufTemp[1]), 3 * 5);
+			flashfilesystem.cache_dirty = 1;
+			flashfile_cacheFlush();
 		}
 		else if (USBD_Dev_DS_lastWValue == 0x0314)
 		{

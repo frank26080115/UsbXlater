@@ -15,7 +15,7 @@ void dbgwdg_init()
 
 	TIM_TimeBaseInitTypeDef TIM_TimeBaseStructure;
 	TIM_TimeBaseStructure.TIM_Period = 0xFFFFFF;
-	TIM_TimeBaseStructure.TIM_Prescaler = 500; // adjust this, it is in milliseconds
+	TIM_TimeBaseStructure.TIM_Prescaler = 2000; // adjust this, it is in milliseconds
 	TIM_TimeBaseStructure.TIM_ClockDivision = 0;
 	TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
 	TIM_TimeBaseStructure.TIM_RepetitionCounter = 0;

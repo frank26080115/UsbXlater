@@ -163,12 +163,10 @@ USBH_Status USBH_CtlReq_Blocking (	USB_OTG_CORE_HANDLE *pcore,
 
 	while ((systick_1ms_cnt - t) < timeout && pdev->Control.state != CTRL_COMPLETE && pdev->Control.state != CTRL_IDLE && pdev->Control.state != CTRL_ERROR && pdev->Control.state != CTRL_STALLED);
 	{
-		dbg_trace();
 		status = USBH_HandleControl(pcore, pdev);
 	}
 
 	if (pdev->RequestState == CMD_WAIT) {
-		dbg_trace();
 		USBH_CtlReq(pcore, pdev, 0 , 0 );
 	}
 
@@ -454,8 +452,6 @@ USBH_Status USBH_SubmitSetupRequest(USBH_DEV *pdev,
   pdev->Control.buff = buff;
   pdev->Control.length = length;
   pdev->Control.state = CTRL_SETUP;
-
-  dbg_trace();
 
   return USBH_OK;
 }

@@ -132,13 +132,13 @@ g_pfnVectors:
   .word  MemManage_Handler
   .word  BusFault_Handler
   .word  UsageFault_Handler
-  .word  0
-  .word  0
-  .word  0
-  .word  0
+  .word  UnknownVector_Handler
+  .word  UnknownVector_Handler
+  .word  UnknownVector_Handler
+  .word  UnknownVector_Handler
   .word  SVC_Handler
   .word  DebugMon_Handler
-  .word  0
+  .word  UnknownVector_Handler
   .word  PendSV_Handler
   .word  SysTick_Handler
   
