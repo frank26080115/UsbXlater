@@ -738,6 +738,10 @@ uint32_t USB_OTG_USBH_handle_hc_n_In_ISR (USB_OTG_CORE_HANDLE *pcore , uint32_t 
     CLEAR_HC_INT(hcreg , nak);
   }
 
+  if (hcint.b.bblerr)
+  {
+    CLEAR_HC_INT(hcreg , bblerr);
+  }
 
   return 1;
 
