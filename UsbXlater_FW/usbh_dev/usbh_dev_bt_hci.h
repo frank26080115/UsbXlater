@@ -2,7 +2,6 @@
 #define usbh_dev_bt_hci_h
 
 #include <usbh_lib/usbh_core.h>
-#include <bluetooth/hci.h>
 
 void USBH_Dev_BtHci_DeInitDev(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev);
 USBH_Status USBH_Dev_BtHci_Task(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev);
@@ -25,8 +24,8 @@ void USBH_Dev_BtHci_UnrecoveredError(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev
 
 extern USBH_Device_cb_TypeDef USBH_Dev_BtHci_CB;
 
-void USBH_Dev_BtHci_Handle_InterruptIn(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev, void* data_);
-void USBH_Dev_BtHci_Handle_BulkIn(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev, void* data_);
+USBH_Status USBH_Dev_BtHci_Command(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev, uint8_t* data_, int len);
+USBH_Status USBH_Dev_BtHci_TxData(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev, uint8_t* data, int len);
 
 #define USBHCI_MIN_POLL	10
 
@@ -63,7 +62,7 @@ typedef struct
 	uint8_t              port_busy;
 	uint8_t              check_bulk;
 	uint8_t              start_toggle;
-	BTHCI_t              bthci;
+	void (*packet_handler)(uint8_t packet_type, uint8_t *packet, int size);
 }
 UsbHci_Data_t;
 

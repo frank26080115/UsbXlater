@@ -8,7 +8,8 @@
 #include <stm32fx/peripherals.h>
 #include <stdlib.h>
 #include <vcp.h>
-#include <bluetooth/hci.h>
+#include <btstack/hci_transport_stm32usbh.h>
+#include <btstack/hci_cmds.h>
 
 USBH_Device_cb_TypeDef USBH_Dev_BtHci_CB = {
 	USBH_Dev_BtHci_DeInitDev,
@@ -31,18 +32,6 @@ USBH_Device_cb_TypeDef USBH_Dev_BtHci_CB = {
 	USBH_Dev_BtHci_UnrecoveredError,
 };
 
-void USBH_Dev_BtHci_Handle_InterruptIn(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev, void* data_)
-{
-	UsbHci_Data_t* UsbHci_Data = pdev->Usr_Data;
-	HCI_HandleEvent(&UsbHci_Data->bthci, (uint8_t*)data_);
-}
-
-void USBH_Dev_BtHci_Handle_BulkIn(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev, void* data_)
-{
-	UsbHci_Data_t* UsbHci_Data = pdev->Usr_Data;
-	HCI_HandleData(&UsbHci_Data->bthci, (uint8_t*)data_);
-}
-
 void USBH_Dev_BtHci_DeInitDev(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 {
 	UsbHci_Data_t* UsbHci_Data = pdev->Usr_Data;
@@ -55,8 +44,6 @@ void USBH_Dev_BtHci_DeInitDev(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 USBH_Status USBH_Dev_BtHci_Task(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 {
   UsbHci_Data_t* UsbHci_Data = pdev->Usr_Data;
-
-  HCI_Task(&UsbHci_Data->bthci);
 
   USBH_Status status = USBH_OK;
 
@@ -160,11 +147,17 @@ USBH_Status USBH_Dev_BtHci_Task(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
       if(UsbHci_Data->start_toggle != 0) /* handle data once */
       {
         UsbHci_Data->start_toggle = 0;
-        if (UsbHci_Data->check_bulk == 0) {
-          USBH_Dev_BtHci_Handle_InterruptIn(pcore, pdev, UsbHci_Data->buff);
+        if (UsbHci_Data->check_bulk == 0)
+        {
+          if (UsbHci_Data->packet_handler) {
+            UsbHci_Data->packet_handler(HCI_EVENT_PACKET, UsbHci_Data->buff, HCD_GetXferCnt(pcore, UsbHci_Data->hc_num_intin));
+          }
         }
-        else {
-          USBH_Dev_BtHci_Handle_BulkIn(pcore, pdev, UsbHci_Data->buff);
+        else
+        {
+          if (UsbHci_Data->packet_handler) {
+            UsbHci_Data->packet_handler(HCI_ACL_DATA_PACKET, UsbHci_Data->buff, HCD_GetXferCnt(pcore, UsbHci_Data->hc_num_bulkin));
+          }
         }
         UsbHci_Data->state = UsbHciState_GET_DATA;
         toDeallocate = 1;
@@ -267,8 +260,8 @@ void USBH_Dev_BtHci_EnumerationDone(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 	}
 	pdev->Usr_Data = calloc(1, sizeof(UsbHci_Data_t));
 	UsbHci_Data_t* UsbHci_Data = pdev->Usr_Data;
-	UsbHci_Data->bthci.usb_core = pcore;
-	UsbHci_Data->bthci.usbh_dev = pdev;
+
+	// TODO start btstack
 
 	UsbHci_Data->state     = UsbHciState_IDLE;
 	//UsbHci_Data->ctl_state = UsbHciState_REQ_IDLE;
@@ -333,7 +326,7 @@ void USBH_Dev_BtHci_UnrecoveredError(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev
 	dbg_printf(DBGMODE_ERR, "USBH_Dev_BtHci_UnrecoveredError \r\n");
 }
 
-USBH_Status USBH_Dev_BtHci_Command(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev, uint8_t* data, uint8_t len)
+USBH_Status USBH_Dev_BtHci_Command(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev, uint8_t* data, int len)
 {
 	USBH_Status status;
 
@@ -385,7 +378,7 @@ USBH_Status USBH_Dev_BtHci_Command(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev, 
 	return status;
 }
 
-USBH_Status USBH_Dev_BtHci_TxData(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev, uint8_t* data, uint8_t len)
+USBH_Status USBH_Dev_BtHci_TxData(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev, uint8_t* data, int len)
 {
 	USBH_Status status;
 	UsbHci_Data_t* UsbHci_Data = pdev->Usr_Data;
@@ -406,7 +399,42 @@ USBH_Status USBH_Dev_BtHci_TxData(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev, u
 		}
 	}
 
-	status = USBH_BulkSendData(pcore, data, len, UsbHci_Data->hc_num_bulkout);
+	delay_1ms_cnt = 100;
+	int rem = len;
+	int idx = 0;
+	do
+	{
+		uint8_t toSend = rem;
+		if (toSend > UsbHci_Data->bulkOutLen) {
+			toSend = UsbHci_Data->bulkOutLen;
+		}
+		status = USBH_BulkSendData(pcore, &data[idx], toSend, UsbHci_Data->hc_num_bulkout);
+		URB_STATE URB_Status;
+		do
+		{
+			// wait for transmission to finish
+			URB_Status = HCD_GetURB_State(pcore, UsbHci_Data->hc_num_bulkout);
+			if (URB_Status == URB_DONE)
+			{
+				rem -= toSend;
+				idx += toSend;
+				break;
+			}
+			else if (URB_Status == URB_STALL)
+			{
+				rem = 0;
+				status = USBH_STALL;
+				break;
+			}
+			else if (URB_Status == URB_NOTREADY)
+			{
+				// reattempt
+				break;
+			}
+		}
+		while (1);
+	}
+	while (rem > 0 && delay_1ms_cnt > 0);
 
 	if (reqUnalloc != 0) {
 		USBH_Free_Channel(pcore, &(UsbHci_Data->hc_num_bulkout));

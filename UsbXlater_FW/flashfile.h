@@ -36,8 +36,8 @@ typedef struct
 		struct {
 			uint8_t dongle_bdaddr[6];
 			uint8_t report_a3[8 * 6];
-			uint8_t report_12[3 * 5];
-			uint8_t report_13[6 + 8 + 8];
+			uint8_t report_12[3 * 5]; // the first 6 bytes is the DS4 BD_ADDR
+			uint8_t report_13[6 + 8 + 8]; // the first 6 bytes is the PS4 BD_ADDR
 			uint8_t report_02[36];
 			uint8_t link_key[16];
 		} fmt;

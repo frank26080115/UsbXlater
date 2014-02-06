@@ -56,6 +56,7 @@ uint16_t fletcher16(uint8_t const * data, size_t bytes);
 uint32_t version_crc();
 uint8_t* print_bdaddr(uint8_t*);
 uint8_t* print_linkkey(uint8_t*);
+int freeRam();
 
 extern volatile uint32_t systick_1ms_cnt;
 extern volatile uint32_t delay_1ms_cnt;

@@ -84,6 +84,25 @@ uint8_t* print_linkkey(uint8_t* data)
 	return &global_temp_buff[GLOBAL_TEMP_BUFF_SIZE / 2];
 }
 
+extern void* _sbrk(int);
+int freeRam()
+{
+	// post #9 from http://forum.pjrc.com/threads/23256-Get-Free-Memory-for-Teensy-3-0
+	uint32_t stackTop;
+	uint32_t heapTop;
+
+	// current position of the stack.
+	stackTop = (uint32_t) &stackTop;
+
+	// current position of heap.
+	void* hTop = malloc(1);
+	heapTop = (uint32_t) hTop;
+	free(hTop);
+
+	// The difference is the free, available ram.
+	return stackTop - heapTop;
+}
+
 #ifdef  USE_FULL_ASSERT
 /**
   * @brief  Reports the name of the source file and the source line number

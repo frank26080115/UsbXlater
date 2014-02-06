@@ -10,7 +10,9 @@
 
 void swo_init()
 {
-	uint32_t SWOSpeed = 6000000; //6000kbps, default for JLinkSWOViewer
+	uint32_t SWOSpeed
+		//= 6000000; //6000kbps, default for JLinkSWOViewer
+		= 2000000; //2000kbps, default for ST Link Utility
 	uint32_t SWOPrescaler = (SystemCoreClock / SWOSpeed) - 1; // SWOSpeed in Hz
 	CoreDebug->DEMCR = CoreDebug_DEMCR_TRCENA_Msk;
 	DBGMCU->CR = DBGMCU_CR_TRACE_IOEN | DBGMCU_CR_DBG_STANDBY | DBGMCU_CR_DBG_STOP | DBGMCU_CR_DBG_SLEEP;

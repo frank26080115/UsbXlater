@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#define PERFORM_CRC_TEST
+//#define PERFORM_CRC_TEST
 
 extern uint32_t (*crc32_prefered)(uint8_t*, int);
 void crc_reset();

@@ -270,6 +270,8 @@ void UnknownVector_Handler(void)
 /*  file (startup_stm32fxxx.s).                                                */
 /******************************************************************************/
 
+#if 0
+
 void WWDG_IRQHandler()
 {
 	dbg_printf(DBGMODE_ERR, "\r\nUnhandled IRQ, file:" __FILE__ ", line: %d\r\n", __LINE__);
@@ -450,10 +452,12 @@ void SPI2_IRQHandler()
 	dbg_printf(DBGMODE_ERR, "\r\nUnhandled IRQ, file:" __FILE__ ", line: %d\r\n", __LINE__);
 }
 
+/*
 void USART2_IRQHandler()
 {
 	dbg_printf(DBGMODE_ERR, "\r\nUnhandled IRQ, file:" __FILE__ ", line: %d\r\n", __LINE__);
 }
+*/
 
 void USART3_IRQHandler()
 {
@@ -654,5 +658,7 @@ void FPU_IRQHandler()
 {
 	dbg_printf(DBGMODE_ERR, "\r\nUnhandled IRQ, file:" __FILE__ ", line: %d\r\n", __LINE__);
 }
+
+#endif
 
 /************************ (C) COPYRIGHT STMicroelectronics *****END OF FILE****/

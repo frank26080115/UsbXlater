@@ -2,6 +2,10 @@
 #include "led.h"
 #include "vcp.h"
 #include "utilities.h"
+#include "crc.h"
+#include "flashfile.h"
+#include "btstack/btproxy.h"
+#include "btstack/hci_cereal.h"
 #include <kbm2c/kbm2ctrl.h>
 #include <stdlib.h>
 #include <string.h>
@@ -41,7 +45,7 @@ int main(void)
 
 	led_init();
 
-	cereal_init(CEREAL_BAUD_RATE);
+	//cereal_init(CEREAL_BAUD_RATE);
 	swo_init();
 
 	// this step determines the default output method of debug
@@ -53,8 +57,9 @@ int main(void)
 				| DBGMODE_DEBUG
 				;
 
-	cereal_printf("\r\n\r\nhello world\r\n");
-	swo_printf("\r\n\r\nCompiled on " __DATE__ ", " __TIME__", ");
+	//cereal_printf("\r\n\r\nhello world\r\n");
+	swo_printf("\r\n\r\nUsbXlater, UID %08X\r\n", DBGMCU->IDCODE);
+	swo_printf("Compiled on " __DATE__ ", " __TIME__", ");
 	#ifdef __GNUC__
 	swo_printf("GNU C %d", __GNUC__);
 	#ifdef __GNUC_MINOR__
@@ -70,6 +75,21 @@ int main(void)
 	#ifndef __FUNCTION__
 	#define __FUNCTION__
 	#endif
+	swo_printf("Free RAM: %d\r\n", freeRam());
+
+	crc_init();
+
+	/*
+	// TODO, this is a simplified loop without fancy functionality, remove when testing is done
+	btproxy_init_RN42HCI();
+	while (1)
+	{
+		btproxy_task();
+	}
+	//*/
+
+	flashfile_init();
+	//flashfile_sectorDump();
 
 	led_1_on(); delay_ms(150); led_1_off();
 	led_2_on(); delay_ms(150); led_2_off();
@@ -124,6 +144,14 @@ int main(void)
 	host_intf_state = HISTATE_NONE;
 	dev_intf_state = DISTATE_NONE;
 
+	// TODO, this is a simplified loop without fancy functionality, remove when testing is done
+	while (1)
+	{
+		dbgwdg_feed();
+
+		USBH_Process(&USB_OTG_Core_host, &USBH_Dev);
+	}
+
 	while (1)
 	{
 		dbgwdg_feed();
@@ -152,30 +180,21 @@ int main(void)
 		{
 			dev_intf_state = DISTATE_VCP;
 
-			dbgwdg_feed();
-
 			// force a disconnection
 			DCD_DevDisconnect(&USB_OTG_Core_dev);
-
-			dbgwdg_feed();
 
 			// setup new handler callbacks
 			USBD_DeInit(&USB_OTG_Core_dev);
 			USBD_Init(&USB_OTG_Core_dev, USB_OTG_HS_CORE_ID, &USBD_Dev_CDC_cb);
 			DCD_DevDisconnect(&USB_OTG_Core_dev);
 
-			dbg_trace();
-
 			// disconnection delay, super long because Windows might not re-enumerate if it is too short
 			uint32_t t = systick_1ms_cnt;
 			while ((systick_1ms_cnt - t) < 200) ;
 
-			dbgwdg_feed();
-
 			// force a reconnection to reenumerate as CDC
 			DCD_DevConnect(&USB_OTG_Core_dev);
 
-			dbgwdg_feed();
 			dbg_printf(DBGMODE_TRACE, "Entering VCP Mode\r\n");
 		}
 
@@ -226,6 +245,8 @@ void SysTick_Handler(void)
 	}
 
 	systick_1ms_cnt++;
+
+	//if (hal_tick_handler != 0) hal_tick_handler();
 }
 
 void run_passthrough()
