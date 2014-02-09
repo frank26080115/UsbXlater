@@ -176,7 +176,7 @@ static void h4_statemachine(void){
 	}
 }
 
-static int    h4_process(struct data_source *ds) {
+static int h4_process(struct data_source *ds) {
 
 	int read_now = bytes_to_read;
 	uint8_t x;

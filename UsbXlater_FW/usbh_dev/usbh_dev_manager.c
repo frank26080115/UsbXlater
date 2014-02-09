@@ -1,4 +1,8 @@
 #include "usbh_dev_manager.h"
+#include <usbh_lib/usbh_core.h>
+#include <usbh_lib/usbh_def.h>
+#include <usbh_lib/usbh_hcs.h>
+#include <usbotg_lib/usb_core.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -38,4 +42,76 @@ void USBH_Dev_AddrManager_Reset()
 	for (int i = 0; i < USBH_DEV_MAX_ADDR_DIV8; i++) {
 		USBH_Dev_UsedAddr[i] = 0;
 	}
+}
+
+void USBH_Dev_FreeControl(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
+{
+	if (pdev->Control.hc_num_in >= 0 || pdev->Control.hc_num_in >= 0) {
+		//dbg_printf(DBGMODE_ERR, "Closing CTRL EPs for %s\r\n", USBH_Dev_DebugPrint(pdev, 0));
+	}
+
+	USBH_Free_Channel(pcore, &(pdev->Control.hc_num_in));
+	USBH_Free_Channel(pcore, &(pdev->Control.hc_num_out));
+}
+
+int8_t USBH_Dev_AllocControl(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
+{
+	char ret = 0;
+	if (pdev->Control.hc_num_in < 0)
+	{
+		ret |= 1;
+		if (USBH_Open_Channel(	pcore,
+								&(pdev->Control.hc_num_in),
+								0x80,
+								pdev->device_prop.address,
+								pdev->device_prop.speed,
+								EP_TYPE_CTRL,
+								pdev->Control.ep0size) != HC_OK)
+		{
+			ret |= 4;
+			dbg_printf(DBGMODE_ERR, "%s unable to open CTRL IN EP\r\n", USBH_Dev_DebugPrint(pdev, 0));
+		}
+	}
+	if (pdev->Control.hc_num_out < 0)
+	{
+		ret |= 2;
+		if (USBH_Open_Channel(	pcore,
+								&(pdev->Control.hc_num_out),
+								0x00,
+								pdev->device_prop.address,
+								pdev->device_prop.speed,
+								EP_TYPE_CTRL,
+								pdev->Control.ep0size) != HC_OK)
+		{
+			ret |= 8;
+			dbg_printf(DBGMODE_ERR, "%s unable to open CTRL OUT EP\r\n", USBH_Dev_DebugPrint(pdev, 0));
+		}
+	}
+
+	if (ret == 0x03) {
+		//dbg_printf(DBGMODE_ERR, "Opened CTRL EPs for %s, in:%d out:%d\r\n", USBH_Dev_DebugPrint(pdev, 0), pdev->Control.hc_num_in, pdev->Control.hc_num_out);
+		return 1;
+	}
+	else if (ret == 0x00) {
+		return 0;
+	}
+	else {
+		return -1;
+	}
+}
+
+char* USBH_Dev_DebugPrint(USBH_DEV *pdev, USBH_EpDesc_TypeDef* ep)
+{
+	int idx = GLOBAL_TEMP_BUFF_SIZE - 32;
+	if (pdev != 0) {
+		idx += sprintf(&global_temp_buff[idx], "V%04XP%04X", pdev->device_prop.Dev_Desc.idVendor, pdev->device_prop.Dev_Desc.idProduct);
+		if (pdev->Parent == 0) {
+			idx += sprintf(&global_temp_buff[idx], "R");
+		}
+		idx += sprintf(&global_temp_buff[idx], "A%d", pdev->device_prop.address);
+	}
+	if (ep != 0) {
+		idx += sprintf(&global_temp_buff[idx], "EP%02X", ep->bEndpointAddress);
+	}
+	return &global_temp_buff[GLOBAL_TEMP_BUFF_SIZE - 32];
 }

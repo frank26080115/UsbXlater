@@ -167,7 +167,7 @@
 #elif (HSE_VALUE == 24000000)
 
 /* PLL_VCO = (HSE_VALUE or HSI_VALUE / PLL_M) * PLL_N */
-#define PLL_M      25
+#define PLL_M      24
 #define PLL_N      336
 
 /* SYSCLK = PLL_VCO / PLL_P */

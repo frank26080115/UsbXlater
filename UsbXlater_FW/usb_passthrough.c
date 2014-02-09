@@ -220,7 +220,7 @@ uint8_t USBPTD_SetupStage(USB_OTG_CORE_HANDLE* pcore, USB_SETUP_REQ* req)
 		USBD_StdDevReq(pcore, req);
 
 		// pass it to the downstream device
-		USBH_CtlReq_Blocking(&USB_OTG_Core_host, USBPT_Dev, 0, 0, 100);
+		USBH_CtlReq_Blocking(&USB_OTG_Core_host, USBPT_Dev, 0, 0);
 		USBD_CtlSendStatus(pcore);
 
 		// modifiy our host channel to match
@@ -276,7 +276,7 @@ uint8_t USBPTD_SetupStage(USB_OTG_CORE_HANDLE* pcore, USB_SETUP_REQ* req)
 
 	// no data means we can just directly relay the data
 	if (req->wLength == 0) {
-		USBH_CtlReq_Blocking(&USB_OTG_Core_host, USBPT_Dev, 0, 0, 100);
+		USBH_CtlReq_Blocking(&USB_OTG_Core_host, USBPT_Dev, 0, 0);
 		USBD_CtlSendStatus(pcore);
 		return USBD_OK;
 	}

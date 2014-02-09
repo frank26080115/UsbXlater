@@ -126,8 +126,7 @@ USBH_Status USBH_CtlReq (USB_OTG_CORE_HANDLE *pcore,
 USBH_Status USBH_CtlReq_Blocking (USB_OTG_CORE_HANDLE *pcore,
                          USBH_DEV *pdev,
                          uint8_t             *buff,
-                         uint16_t            length,
-                         uint32_t            timeout);
+                         uint16_t            length);
 
 USBH_Status USBH_IsocReceiveData( USB_OTG_CORE_HANDLE *pcore,
                                 uint8_t *buff,

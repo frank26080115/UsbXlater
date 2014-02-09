@@ -2,6 +2,7 @@
 #define usbh_dev_bt_hci_h
 
 #include <usbh_lib/usbh_core.h>
+#include <usbh_dev/usbh_devio_manager.h>
 
 void USBH_Dev_BtHci_DeInitDev(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev);
 USBH_Status USBH_Dev_BtHci_Task(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev);
@@ -26,46 +27,18 @@ extern USBH_Device_cb_TypeDef USBH_Dev_BtHci_CB;
 
 USBH_Status USBH_Dev_BtHci_Command(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev, uint8_t* data_, int len);
 USBH_Status USBH_Dev_BtHci_TxData(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev, uint8_t* data, int len);
-
-#define USBHCI_MIN_POLL	10
-
-typedef enum
-{
-	UsbHciState_IDLE = 0,
-	UsbHciState_SEND_DATA,
-	UsbHciState_BUSY,
-	UsbHciState_GET_DATA,
-	UsbHciState_SYNC,
-	UsbHciState_POLL,
-	UsbHciState_ERROR,
-}
-UsbHci_State;
+char USBH_Dev_BtHci_CanSendPacket(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev);
 
 typedef struct
 {
-	UsbHci_State         state;
-	uint8_t              buff[64];
-	int8_t               hc_num_intin;
-	int8_t               hc_num_bulkin;
-	int8_t               hc_num_bulkout;
-	uint8_t              intInEp;
-	uint8_t              bulkOutEp;
-	uint8_t              bulkInEp;
-	uint16_t             bulkInLen;
-	uint16_t             bulkOutLen;
-	uint16_t             intInLen;
-	uint8_t              ep_addr;
-	uint16_t             poll;
-	__IO uint16_t        timer;
-	//USB_Setup_TypeDef    setup;
-	uint8_t              num_ports;
-	uint8_t              port_busy;
-	uint8_t              check_bulk;
-	uint8_t              start_toggle;
+	USBH_DevIO_t* eventIO;
+	USBH_DevIO_t* dataInIO;
+	USBH_DevIO_t* dataOutIO;
+	uint8_t ioIdx;
 	void (*packet_handler)(uint8_t packet_type, uint8_t *packet, int size);
 }
 UsbHci_Data_t;
 
-//#define USBHCI_ENABLE_DYNAMIC_HC_ALLOC
+#define USBHCI_ENABLE_DYNAMIC_HC_ALLOC
 
 #endif

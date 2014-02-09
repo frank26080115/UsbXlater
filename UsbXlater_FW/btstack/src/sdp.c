@@ -659,3 +659,6 @@ static void sdp_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *p
 	}
 }
 
+// hack to add code that can access some of the static functions
+#define INCLUDING_FROM_SDP_C
+#include <btstack/btproxy_sdp.h>

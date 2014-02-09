@@ -133,6 +133,7 @@ void stm32usbh_handle_raw(uint8_t packet_type, uint8_t* data, int sz)
 {
 	if (stm32usbh_state == STM32USBH_PACKET_TYPE && read_pos == 0) {
 		hci_packet[read_pos++] = packet_type;
+		bytes_to_read--;
 	}
 
 	for (int i = 0; i < sz; ) {
@@ -156,7 +157,7 @@ static int stm32usbh_can_send_packet_now(uint8_t packet_type)
 	if (BT_USBH_CORE == 0 || BT_USBH_DEV == 0) {
 		return 0;
 	}
-	return 1;
+	return USBH_Dev_BtHci_CanSendPacket(BT_USBH_CORE, BT_USBH_DEV);
 }
 
 static void stm32usbh_register_packet_handler(void (*handler)(uint8_t packet_type, uint8_t *packet, int size)){
@@ -164,16 +165,7 @@ static void stm32usbh_register_packet_handler(void (*handler)(uint8_t packet_typ
 }
 
 int stm32usbh_process(struct data_source *ds) {
-	if (BT_USBH_CORE == 0 || BT_USBH_DEV == 0) {
-		return 0;
-	}
-
-	UsbHci_Data_t* uhd = (UsbHci_Data_t*)BT_USBH_DEV->Usr_Data;
-	uhd->packet_handler = stm32usbh_handle_raw;
-
-	USBH_Process(BT_USBH_CORE, BT_USBH_DEV);
-
-	return 0;
+	return 1;
 }
 
 static const char * stm32usbh_get_transport_name(){

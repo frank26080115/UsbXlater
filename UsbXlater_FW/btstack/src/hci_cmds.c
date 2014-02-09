@@ -426,6 +426,14 @@ const hci_cmd_t hci_read_local_supported_features = {
 OPCODE(OGF_INFORMATIONAL_PARAMETERS, 0x03), ""
 // no params
 };
+const hci_cmd_t hci_read_local_supported_commands = {
+OPCODE(OGF_INFORMATIONAL_PARAMETERS, 0x02), ""
+// no params
+};
+const hci_cmd_t hci_read_local_version_information = {
+OPCODE(OGF_INFORMATIONAL_PARAMETERS, 0x01), ""
+// no params
+};
 const hci_cmd_t hci_read_buffer_size = {
 OPCODE(OGF_INFORMATIONAL_PARAMETERS, 0x05), ""
 // no params

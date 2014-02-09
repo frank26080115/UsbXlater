@@ -28,6 +28,7 @@
 
 #include "usbh_ioreq.h"
 #include "usbh_core.h"
+#include <usbh_dev/usbh_dev_manager.h>
 
 /** @addtogroup USBH_LIB
   * @{
@@ -127,14 +128,14 @@ USBH_Status USBH_CtlReq     (USB_OTG_CORE_HANDLE *pcore,
     }
     else if  (pdev->Control.state == CTRL_ERROR)
     {
-      dbg_printf(DBGMODE_ERR, "USBH_CtlReq state == CTRL_ERROR \r\n");
+      dbg_printf(DBGMODE_ERR, "USBH_CtlReq %s state == CTRL_ERROR \r\n", USBH_Dev_DebugPrint(pdev, 0));
       /* Failure Mode */
       pdev->RequestState = CMD_SEND;
       status = USBH_FAIL;
     }
      else if  (pdev->Control.state == CTRL_STALLED )
     {
-      dbg_printf(DBGMODE_ERR, "USBH_CtlReq state == CTRL_STALLED \r\n");
+      dbg_printf(DBGMODE_ERR, "USBH_CtlReq %s state == CTRL_STALLED \r\n", USBH_Dev_DebugPrint(pdev, 0));
       /* Commands successfully sent and Response Received  */
       pdev->RequestState = CMD_SEND;
       status = USBH_NOT_SUPPORTED;
@@ -142,65 +143,10 @@ USBH_Status USBH_CtlReq     (USB_OTG_CORE_HANDLE *pcore,
     break;
 
   default:
-    dbg_printf(DBGMODE_ERR, "r\n USBH_CtlReq pdev->RequestState = 0x%02X\r\n", pdev->RequestState);
+    dbg_printf(DBGMODE_ERR, "USBH_CtlReq %s pdev->RequestState = 0x%02X\r\n", USBH_Dev_DebugPrint(pdev, 0), pdev->RequestState);
     break;
   }
   return status;
-}
-
-USBH_Status USBH_CtlReq_Blocking (	USB_OTG_CORE_HANDLE *pcore,
-									USBH_DEV            *pdev,
-									uint8_t             *buff,
-									uint16_t            length,
-									uint32_t            timeout)
-{
-
-	dbgwdg_feed();
-
-	USBH_Status status;
-
-	uint32_t t = systick_1ms_cnt;
-
-	while ((systick_1ms_cnt - t) < timeout && pdev->Control.state != CTRL_COMPLETE && pdev->Control.state != CTRL_IDLE && pdev->Control.state != CTRL_ERROR && pdev->Control.state != CTRL_STALLED);
-	{
-		status = USBH_HandleControl(pcore, pdev);
-	}
-
-	if (pdev->RequestState == CMD_WAIT) {
-		USBH_CtlReq(pcore, pdev, 0 , 0 );
-	}
-
-	pdev->RequestState = CMD_SEND;
-	pdev->Control.state = CTRL_IDLE;
-
-	t = systick_1ms_cnt;
-
-	do
-	{
-		status = USBH_CtlReq(pcore, pdev, buff , length );
-		if (status == USBH_OK)
-		{
-			dbgwdg_feed();
-			return USBH_OK;
-		}
-		else if (status == USBH_FAIL || status == USBH_STALL || status == USBH_NOT_SUPPORTED) {
-			dbgwdg_feed();
-			return status;
-		}
-		else
-		{
-			status = USBH_HandleControl(pcore, pdev);
-			if (status == USBH_FAIL || status == USBH_STALL || status == USBH_NOT_SUPPORTED) {
-				dbgwdg_feed();
-				return status;
-			}
-		}
-	}
-	while ((systick_1ms_cnt - t) < timeout);
-
-	dbg_printf(DBGMODE_ERR, "\r\n USBH_CtlReq_Blocking Timeout \r\n");
-	dbgwdg_feed();
-	return status;
 }
 
 /**

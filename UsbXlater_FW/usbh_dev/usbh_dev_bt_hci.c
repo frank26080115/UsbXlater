@@ -1,6 +1,7 @@
 #include "usbh_dev_bt_hci.h"
 #include "usbh_dev_cb_default.h"
 #include "usbh_dev_manager.h"
+#include "usbh_devio_manager.h"
 #include <usbh_lib/usbh_core.h>
 #include <usbh_lib/usbh_hcs.h>
 #include <usbh_lib/usbh_ioreq.h>
@@ -8,6 +9,7 @@
 #include <stm32fx/peripherals.h>
 #include <stdlib.h>
 #include <vcp.h>
+#include <btstack/btproxy.h>
 #include <btstack/hci_transport_stm32usbh.h>
 #include <btstack/hci_cmds.h>
 
@@ -35,162 +37,65 @@ USBH_Device_cb_TypeDef USBH_Dev_BtHci_CB = {
 void USBH_Dev_BtHci_DeInitDev(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 {
 	UsbHci_Data_t* UsbHci_Data = pdev->Usr_Data;
-	USBH_Free_Channel(pcore, &(UsbHci_Data->hc_num_bulkout));
-	USBH_Free_Channel(pcore, &(UsbHci_Data->hc_num_bulkin));
-	USBH_Free_Channel(pcore, &(UsbHci_Data->hc_num_intin));
-	UsbHci_Data->start_toggle = 0;
+	USBH_DevIO_Manager_Unplug(pdev);
+	if (pdev->Usr_Data != 0) {
+		free(pdev->Usr_Data);
+	}
+}
+
+void USBH_Dev_BtHci_D2HIntf_AclDataHandler(void* p_io, uint8_t* data, uint16_t len)
+{
+	USBH_DevIO_t* p_in = (USBH_DevIO_t*)p_io;
+	UsbHci_Data_t* UsbHci_Data = (UsbHci_Data_t*)p_in->pdev->Usr_Data;
+	UsbHci_Data->packet_handler(HCI_ACL_DATA_PACKET, data, len);
+}
+
+void USBH_Dev_BtHci_D2HIntf_EventHandler(void* p_io, uint8_t* data, uint16_t len)
+{
+	USBH_DevIO_t* p_in = (USBH_DevIO_t*)p_io;
+	UsbHci_Data_t* UsbHci_Data = (UsbHci_Data_t*)p_in->pdev->Usr_Data;
+	UsbHci_Data->packet_handler(HCI_EVENT_PACKET, data, len);
 }
 
 USBH_Status USBH_Dev_BtHci_Task(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 {
-  UsbHci_Data_t* UsbHci_Data = pdev->Usr_Data;
-
-  USBH_Status status = USBH_OK;
-
-  int hc_num_in;
-  char toDeallocate = 0;
-
-  switch (UsbHci_Data->state)
-  {
-
-  case UsbHciState_IDLE:
-
-    UsbHci_Data->state = UsbHciState_SYNC;
-    USBH_Free_Channel(pcore, &(pdev->Control.hc_num_in));
-    USBH_Free_Channel(pcore, &(pdev->Control.hc_num_out));
-
-  case UsbHciState_SYNC:
-
-    /* Sync with start of Even Frame */
-    if(USB_OTG_IsEvenFrame(pcore) != FALSE)
-    {
-      UsbHci_Data->state = UsbHciState_GET_DATA;
-    }
-    else
-    {
-      break;
-    }
-
-  case UsbHciState_GET_DATA:
-
-	#ifdef USBHCI_ENABLE_DYNAMIC_HC_ALLOC
-	if (UsbHci_Data->check_bulk == 0)
+	UsbHci_Data_t* UsbHci_Data = (UsbHci_Data_t*)pdev->Usr_Data;
+	if (UsbHci_Data->ioIdx == 0)
 	{
-		if (UsbHci_Data->hc_num_intin < 0) {
-			USBH_Open_Channel  (pcore,
-								&(UsbHci_Data->hc_num_intin),
-								UsbHci_Data->intInEp,
-								pdev->device_prop.address,
-								pdev->device_prop.speed,
-								EP_TYPE_INTR,
-								UsbHci_Data->intInLen);
+		btproxy_init_USB();
+		UsbHci_Data->ioIdx++;
+	}
+	else if (UsbHci_Data->ioIdx == 1)
+	{
+		btproxy_task();
+		UsbHci_Data->ioIdx++;
+	}
+	else if (UsbHci_Data->ioIdx == 2)
+	{
+		USBH_DevIO_Task(UsbHci_Data->dataInIO);
+		if (UsbHci_Data->dataInIO->state == UIOSTATE_NEXT) {
+			UsbHci_Data->ioIdx++;
+		}
+	}
+	else if (UsbHci_Data->ioIdx == 3)
+	{
+		USBH_DevIO_Task(UsbHci_Data->eventIO);
+		if (UsbHci_Data->eventIO->state == UIOSTATE_NEXT) {
+			UsbHci_Data->ioIdx++;
+		}
+	}
+	else if (UsbHci_Data->ioIdx == 4)
+	{
+		USBH_DevIO_Task(UsbHci_Data->dataOutIO);
+		if (UsbHci_Data->dataOutIO->state == UIOSTATE_NEXT) {
+			UsbHci_Data->ioIdx++;
 		}
 	}
 	else
 	{
-		if (UsbHci_Data->hc_num_bulkin < 0) {
-			USBH_Open_Channel  (pcore,
-								&(UsbHci_Data->hc_num_bulkin),
-								UsbHci_Data->bulkInEp,
-								pdev->device_prop.address,
-								pdev->device_prop.speed,
-								EP_TYPE_BULK,
-								UsbHci_Data->bulkInLen);
-		}
+		UsbHci_Data->ioIdx = 1;
 	}
-
-	if ((UsbHci_Data->hc_num_intin >= 0 && UsbHci_Data->check_bulk == 0) || (UsbHci_Data->hc_num_bulkin >= 0 && UsbHci_Data->check_bulk != 0)) {
-	#endif
-	if(USB_OTG_IsEvenFrame(pcore) != FALSE)
-	{
-		if (UsbHci_Data->check_bulk == 0)
-		{
-			USBH_InterruptReceiveData(pcore,
-									  UsbHci_Data->buff,
-									  16,
-									  UsbHci_Data->hc_num_intin);
-		}
-		else
-		{
-			USBH_BulkReceiveData(pcore,
-									  UsbHci_Data->buff,
-									  64,
-									  UsbHci_Data->hc_num_bulkin);
-		}
-		UsbHci_Data->start_toggle = 1;
-
-		UsbHci_Data->state = UsbHciState_POLL;
-		UsbHci_Data->timer = HCD_GetCurrentFrame(pcore);
-
-		dbgwdg_feed();
-	}
-	#ifdef USBHCI_ENABLE_DYNAMIC_HC_ALLOC
-    }
-    else {
-      dbg_printf(DBGMODE_ERR, "Unable to allocate channel for USB HCI D2H\r\n");
-      UsbHci_Data->hc_num_intin = -1;
-    }
-    #endif
-    break;
-
-  case UsbHciState_POLL:
-    hc_num_in = (UsbHci_Data->check_bulk == 0) ? UsbHci_Data->hc_num_intin : UsbHci_Data->hc_num_bulkin;
-
-    if(( HCD_GetCurrentFrame(pcore) - UsbHci_Data->timer) >= UsbHci_Data->poll)
-    {
-      UsbHci_Data->state = UsbHciState_GET_DATA;
-      UsbHci_Data->check_bulk = !UsbHci_Data->check_bulk;
-      toDeallocate = 1;
-    }
-    else if(HCD_GetURB_State(pcore , hc_num_in) == URB_DONE)
-    {
-      if(UsbHci_Data->start_toggle != 0) /* handle data once */
-      {
-        UsbHci_Data->start_toggle = 0;
-        if (UsbHci_Data->check_bulk == 0)
-        {
-          if (UsbHci_Data->packet_handler) {
-            UsbHci_Data->packet_handler(HCI_EVENT_PACKET, UsbHci_Data->buff, HCD_GetXferCnt(pcore, UsbHci_Data->hc_num_intin));
-          }
-        }
-        else
-        {
-          if (UsbHci_Data->packet_handler) {
-            UsbHci_Data->packet_handler(HCI_ACL_DATA_PACKET, UsbHci_Data->buff, HCD_GetXferCnt(pcore, UsbHci_Data->hc_num_bulkin));
-          }
-        }
-        UsbHci_Data->state = UsbHciState_GET_DATA;
-        toDeallocate = 1;
-      }
-    }
-    else if(HCD_GetURB_State(pcore, hc_num_in) == URB_NOTREADY) // NAK
-    {
-      toDeallocate = 1;
-    }
-    else if(HCD_GetURB_State(pcore, hc_num_in) == URB_STALL) // Stalled
-    {
-      UsbHci_Data->state = UsbHciState_GET_DATA;
-      UsbHci_Data->check_bulk = !UsbHci_Data->check_bulk;
-      toDeallocate = 1;
-    }
-
-    #ifdef USBHCI_ENABLE_DYNAMIC_HC_ALLOC
-    if (toDeallocate != 0) {
-      if (UsbHci_Data->hc_num_bulkin >= 0) {
-        USBH_Free_Channel(pcore, &(UsbHci_Data->hc_num_bulkin));
-      }
-      if (UsbHci_Data->hc_num_intin >= 0) {
-        USBH_Free_Channel(pcore, &(UsbHci_Data->hc_num_intin));
-      }
-    }
-    #endif
-    break;
-
-  default:
-    dbg_printf(DBGMODE_ERR, "UsbHci_Task unknown UsbHci_Data->state 0x%02X \r\n", UsbHci_Data->state);
-    break;
-  }
-	return status;
+	return USBH_OK;
 }
 
 void USBH_Dev_BtHci_Init(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
@@ -252,66 +157,107 @@ void USBH_Dev_BtHci_ConfigurationDescAvailable(USB_OTG_CORE_HANDLE *pcore , USBH
 
 void USBH_Dev_BtHci_EnumerationDone(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 {
-	dbg_printf(DBGMODE_TRACE, "UsbHci_EnumerationDone \r\n");
+	dbg_printf(DBGMODE_TRACE, "UsbHci_EnumerationDone %s\r\n", USBH_Dev_DebugPrint(pdev, 0));
 
 	if (pdev->Usr_Data != 0) {
 		free(pdev->Usr_Data);
 		pdev->Usr_Data = 0;
 	}
+
 	pdev->Usr_Data = calloc(1, sizeof(UsbHci_Data_t));
 	UsbHci_Data_t* UsbHci_Data = pdev->Usr_Data;
+	UsbHci_Data->ioIdx = 0;
+	UsbHci_Data->eventIO = 0;
+	UsbHci_Data->dataInIO = 0;
+	UsbHci_Data->dataOutIO = 0;
 
-	// TODO start btstack
+	char dynamicHc = 0;
+	#ifdef USBHCI_ENABLE_DYNAMIC_HC_ALLOC
+	dynamicHc = 1;
+	#endif
 
-	UsbHci_Data->state     = UsbHciState_IDLE;
-	//UsbHci_Data->ctl_state = UsbHciState_REQ_IDLE;
 
-	UsbHci_Data->poll = 10;
+	//dbg_printf(DBGMODE_DEBUG, "%s bNumInterfaces:%d\r\n", USBH_Dev_DebugPrint(pdev, 0), pdev->device_prop.Cfg_Desc.bNumInterfaces);
 
-	UsbHci_Data->intInEp = 0x01 | USB_D2H;
-	UsbHci_Data->bulkInEp = 0x03 | USB_D2H;
-	UsbHci_Data->bulkOutEp = 0x03 | USB_H2D;
-
-	UsbHci_Data->hc_num_bulkin = -1;
-	UsbHci_Data->hc_num_bulkout = -1;
-	UsbHci_Data->hc_num_intin = -1;
-
-	UsbHci_Data->intInLen = 16;
-	UsbHci_Data->bulkInLen = 64;
-	UsbHci_Data->bulkOutLen = 64;
-
-#ifndef USBHCI_ENABLE_DYNAMIC_HC_ALLOC
-	if (USBH_Open_Channel  (pcore,
-							&(UsbHci_Data->hc_num_intin),
-							UsbHci_Data->intInEp,
-							pdev->device_prop.address,
-							pdev->device_prop.speed,
-							EP_TYPE_INTR,
-							UsbHci_Data->intInLen) != HC_OK)
+	for (int intf = 0; intf < pdev->device_prop.Cfg_Desc.bNumInterfaces; intf++)
 	{
-		dbg_printf(DBGMODE_ERR, "Unable to open inter-in-EP for USB BT HCI\r\n");
+		USBH_InterfaceDesc_TypeDef* pintf = &pdev->device_prop.Itf_Desc[intf];
+
+		//dbg_printf(DBGMODE_DEBUG, "%s intf[%d]bNumEndpoints:%d\r\n", USBH_Dev_DebugPrint(pdev, 0), intf, pintf->bNumEndpoints);
+
+		for (int ep = 0; ep < pintf->bNumEndpoints; ep++)
+		{
+			USBH_EpDesc_TypeDef* pep = &pdev->device_prop.Ep_Desc[intf][ep];
+
+			if (UsbHci_Data->eventIO == 0 && pep->bEndpointAddress == (0x01 | USB_D2H) && (pep->bmAttributes & EP_TYPE_MSK) == EP_TYPE_INTR)
+			{
+				if (pep->wMaxPacketSize > 16) {
+					pep->wMaxPacketSize = 16;
+				}
+				UsbHci_Data->eventIO = USBH_DevIO_Manager_New(pcore, pdev, pep, dynamicHc, USBH_Dev_BtHci_D2HIntf_EventHandler, 0);
+				dbg_printf(DBGMODE_DEBUG, "USBHCI %s found event EP\r\n", USBH_Dev_DebugPrint(pdev, pep));
+			}
+			else if (UsbHci_Data->dataInIO == 0 && (pep->bEndpointAddress & USB_EP_DIR_MSK) == USB_D2H && (pep->bmAttributes & EP_TYPE_MSK) == EP_TYPE_BULK)
+			{
+				if (pep->wMaxPacketSize > 64) {
+					pep->wMaxPacketSize = 64;
+				}
+				UsbHci_Data->dataInIO = USBH_DevIO_Manager_New(pcore, pdev, pep, dynamicHc, USBH_Dev_BtHci_D2HIntf_AclDataHandler, 0);
+				dbg_printf(DBGMODE_DEBUG, "USBHCI %s found data in EP\r\n", USBH_Dev_DebugPrint(pdev, pep));
+			}
+			else if (UsbHci_Data->dataOutIO == 0 && (pep->bEndpointAddress & USB_EP_DIR_MSK) == USB_H2D && (pep->bmAttributes & EP_TYPE_MSK) == EP_TYPE_BULK)
+			{
+				if (pep->wMaxPacketSize > 64) {
+					pep->wMaxPacketSize = 64;
+				}
+				UsbHci_Data->dataOutIO = USBH_DevIO_Manager_New(pcore, pdev, pep, dynamicHc, 0, 0);
+				dbg_printf(DBGMODE_DEBUG, "USBHCI %s found data out EP\r\n", USBH_Dev_DebugPrint(pdev, pep));
+			}
+		}
 	}
-	if (USBH_Open_Channel  (pcore,
-							&(UsbHci_Data->hc_num_bulkin),
-							UsbHci_Data->bulkInEp,
-							pdev->device_prop.address,
-							pdev->device_prop.speed,
-							EP_TYPE_BULK,
-							UsbHci_Data->bulkInLen) != HC_OK)
+
+	if (UsbHci_Data->eventIO == 0)
 	{
-		dbg_printf(DBGMODE_ERR, "Unable to open bulk-in-EP for USB BT HCI\r\n");
+		dbg_printf(DBGMODE_DEBUG, "USBHCI %s did not find data in EP, creating manually...\r\n", USBH_Dev_DebugPrint(pdev, 0));
+		USBH_EpDesc_TypeDef* pep = &pdev->device_prop.Ep_Desc[pdev->device_prop.Cfg_Desc.bNumInterfaces][1];
+		pep->bDescriptorType = USB_DESC_TYPE_ENDPOINT;
+		pep->bEndpointAddress = 0x01 | USB_D2H;
+		pep->bInterval = 10;
+		pep->bLength = USB_ENDPOINT_DESC_SIZE;
+		pep->bmAttributes = EP_TYPE_INTR;
+		pep->wMaxPacketSize = 16;
+		UsbHci_Data->eventIO = USBH_DevIO_Manager_New(pcore, pdev, pep, dynamicHc, USBH_Dev_BtHci_D2HIntf_EventHandler, 0);
 	}
-#endif
-	if (USBH_Open_Channel  (pcore,
-							&(UsbHci_Data->hc_num_bulkout),
-							UsbHci_Data->bulkOutEp,
-							pdev->device_prop.address,
-							pdev->device_prop.speed,
-							EP_TYPE_BULK,
-							UsbHci_Data->bulkOutLen) != HC_OK)
+
+	if (UsbHci_Data->dataInIO == 0)
 	{
-		dbg_printf(DBGMODE_ERR, "Unable to open bulk-out-EP for USB BT HCI\r\n");
+		dbg_printf(DBGMODE_DEBUG, "USBHCI %s did not find data in EP, creating manually...\r\n", USBH_Dev_DebugPrint(pdev, 0));
+		USBH_EpDesc_TypeDef* pep = &pdev->device_prop.Ep_Desc[pdev->device_prop.Cfg_Desc.bNumInterfaces][1];
+		pep->bDescriptorType = USB_DESC_TYPE_ENDPOINT;
+		pep->bEndpointAddress = 0x02 | USB_D2H;
+		pep->bInterval = 10;
+		pep->bLength = USB_ENDPOINT_DESC_SIZE;
+		pep->bmAttributes = EP_TYPE_BULK;
+		pep->wMaxPacketSize = 64;
+		UsbHci_Data->dataInIO = USBH_DevIO_Manager_New(pcore, pdev, pep, dynamicHc, USBH_Dev_BtHci_D2HIntf_AclDataHandler, 0);
 	}
+
+	if (UsbHci_Data->dataOutIO == 0)
+	{
+		dbg_printf(DBGMODE_DEBUG, "USBHCI %s did not find data out EP, creating manually...\r\n", USBH_Dev_DebugPrint(pdev, 0));
+		USBH_EpDesc_TypeDef* pep = &pdev->device_prop.Ep_Desc[pdev->device_prop.Cfg_Desc.bNumInterfaces][2];
+		pep->bDescriptorType = USB_DESC_TYPE_ENDPOINT;
+		pep->bEndpointAddress = 0x02 | USB_H2D;
+		pep->bInterval = 10;
+		pep->bLength = USB_ENDPOINT_DESC_SIZE;
+		pep->bmAttributes = EP_TYPE_BULK;
+		pep->wMaxPacketSize = 64;
+		UsbHci_Data->dataOutIO = USBH_DevIO_Manager_New(pcore, pdev, pep, dynamicHc, 0, 0);
+	}
+
+	BT_USBH_CORE = pcore;
+	BT_USBH_DEV = pdev;
+	UsbHci_Data->packet_handler = stm32usbh_handle_raw;
 
 	dbg_printf(DBGMODE_TRACE, "USB BT HCI finished all enumeration steps\r\n");
 }
@@ -332,113 +278,38 @@ USBH_Status USBH_Dev_BtHci_Command(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev, 
 
 	dbg_printf(DBGMODE_TRACE, "USBH_Dev_BtHci_Command \r\n");
 
-	char reqUnalloc = 0;
-	if (pdev->Control.hc_num_in < 0)
-	{
-		reqUnalloc = 1;
-		if (USBH_Open_Channel(	pcore,
-								&(pdev->Control.hc_num_in),
-								0x80,
-								pdev->device_prop.address,
-								pdev->device_prop.speed,
-								EP_TYPE_CTRL,
-								pdev->Control.ep0size) != HC_OK)
-		{
-			dbg_printf(DBGMODE_ERR, "Unable to open ctrl-in-EP for USB BT HCI\r\n");
-		}
-	}
-	if (pdev->Control.hc_num_out < 0)
-	{
-		reqUnalloc = 1;
-		if (USBH_Open_Channel(	pcore,
-								&(pdev->Control.hc_num_out),
-								0x00,
-								pdev->device_prop.address,
-								pdev->device_prop.speed,
-								EP_TYPE_CTRL,
-								pdev->Control.ep0size) != HC_OK)
-		{
-			dbg_printf(DBGMODE_ERR, "Unable to open ctrl-in-EP for USB BT HCI\r\n");
-		}
-	}
-
 	pdev->Control.setup.b.bmRequestType = USB_H2D | USB_REQ_RECIPIENT_DEVICE | USB_REQ_TYPE_CLASS;
 	pdev->Control.setup.b.bRequest = 0;
 	pdev->Control.setup.b.wValue.w = 0;
 	pdev->Control.setup.b.wIndex.w = 0;
 	pdev->Control.setup.b.wLength.w = len;
 
-	status = USBH_CtlReq_Blocking(pcore, pdev, data , len , 500);
-
-	if (reqUnalloc != 0) {
-		USBH_Free_Channel(pcore, &(pdev->Control.hc_num_in));
-		USBH_Free_Channel(pcore, &(pdev->Control.hc_num_out));
-	}
-
+	status = USBH_CtlReq_Blocking(pcore, pdev, data , len );
 	return status;
 }
 
 USBH_Status USBH_Dev_BtHci_TxData(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev, uint8_t* data, int len)
 {
-	USBH_Status status;
+	if (USBH_Dev_BtHci_CanSendPacket(pcore, pdev) == 0) {
+		return USBH_BUSY;
+	}
+
 	UsbHci_Data_t* UsbHci_Data = pdev->Usr_Data;
+	USBH_DevIO_t* io = UsbHci_Data->dataOutIO;
 
-	char reqUnalloc = 0;
-	if (UsbHci_Data->hc_num_bulkout < 0)
-	{
-		reqUnalloc = 1;
-		if (USBH_Open_Channel  (pcore,
-								&(UsbHci_Data->hc_num_bulkout),
-								UsbHci_Data->bulkOutEp,
-								pdev->device_prop.address,
-								pdev->device_prop.speed,
-								EP_TYPE_BULK,
-								UsbHci_Data->bulkOutLen) != HC_OK)
-		{
-			dbg_printf(DBGMODE_ERR, "Unable to open bulk-out-EP for USB BT HCI\r\n");
-		}
-	}
+	io->out_ptr = data;
+	io->remaining = len;
 
-	delay_1ms_cnt = 100;
-	int rem = len;
-	int idx = 0;
-	do
-	{
-		uint8_t toSend = rem;
-		if (toSend > UsbHci_Data->bulkOutLen) {
-			toSend = UsbHci_Data->bulkOutLen;
-		}
-		status = USBH_BulkSendData(pcore, &data[idx], toSend, UsbHci_Data->hc_num_bulkout);
-		URB_STATE URB_Status;
-		do
-		{
-			// wait for transmission to finish
-			URB_Status = HCD_GetURB_State(pcore, UsbHci_Data->hc_num_bulkout);
-			if (URB_Status == URB_DONE)
-			{
-				rem -= toSend;
-				idx += toSend;
-				break;
-			}
-			else if (URB_Status == URB_STALL)
-			{
-				rem = 0;
-				status = USBH_STALL;
-				break;
-			}
-			else if (URB_Status == URB_NOTREADY)
-			{
-				// reattempt
-				break;
-			}
-		}
-		while (1);
-	}
-	while (rem > 0 && delay_1ms_cnt > 0);
+	return USBH_OK;
+}
 
-	if (reqUnalloc != 0) {
-		USBH_Free_Channel(pcore, &(UsbHci_Data->hc_num_bulkout));
-	}
-
-	return status;
+char USBH_Dev_BtHci_CanSendPacket(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
+{
+	UsbHci_Data_t* UsbHci_Data = pdev->Usr_Data;
+	USBH_DevIO_t* io = UsbHci_Data->dataOutIO;
+	if (io->remaining > 0)
+		return 0;
+	if (io->state == UIOSTATE_SEND_DATA || io->state == UIOSTATE_WAIT_DATA || io->state == UIOSTATE_FINALIZE)
+		return 0;
+	return 1;
 }

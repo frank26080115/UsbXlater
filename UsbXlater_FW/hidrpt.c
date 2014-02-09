@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-void HID_Rpt_Desc_Parse(uint8_t* desc, int length, HID_Rpt_Parsing_Params_t* parser, uint8_t intf, uint8_t* repIdList)
+void HID_Rpt_Desc_Parse(uint8_t* desc, int length, HID_Rpt_Parsing_Params_t* parser, uint8_t ep, uint8_t* repIdList)
 {
 	int descIdx = 0;
 	int repBitIdx = 0;
@@ -45,7 +45,7 @@ void HID_Rpt_Desc_Parse(uint8_t* desc, int length, HID_Rpt_Parsing_Params_t* par
 						// generic desktop mouse or pointer
 
 						parser->mouse_exists = 1;
-						parser->mouse_intf = intf;
+						parser->mouse_ep = ep;
 						parser->mouse_report_id = repId;
 
 						if (usagePage == 0x09) // button
@@ -86,7 +86,7 @@ void HID_Rpt_Desc_Parse(uint8_t* desc, int length, HID_Rpt_Parsing_Params_t* par
 					else if (stackedUsagePage == 0x01 && stackedUsage == 0x06 && usagePage == 0x07)
 					{
 						parser->kb_exists = 1;
-						parser->kb_intf = intf;
+						parser->kb_ep = ep;
 						parser->kb_report_id = repId;
 						// TODO: handle special keyboards that don't follow the standard
 					}
@@ -94,8 +94,11 @@ void HID_Rpt_Desc_Parse(uint8_t* desc, int length, HID_Rpt_Parsing_Params_t* par
 
 				repBitIdx += repSize * repCnt;
 
-				if (repIdCnt < 7) {
-					repIdList[repIdCnt++] = repId;
+				if (repIdCnt < 7 && repId > 0)
+				{
+					if ((repIdCnt > 0 && repIdList[repIdCnt - 1] != repId) || repIdCnt == 0) {
+						repIdList[repIdCnt++] = repId;
+					}
 				}
 			}
 			else if (bTag == 0x09) {
@@ -168,7 +171,7 @@ void HID_Rpt_Parsing_Params_Reset(HID_Rpt_Parsing_Params_t* x)
 	memset(x, 0xFF, sizeof(HID_Rpt_Parsing_Params_t));
 }
 
-void HID_Rep_Parsing_Params_Debug_Dump(HID_Rpt_Parsing_Params_t* x)
+void HID_Rpt_Parsing_Params_Debug_Dump(HID_Rpt_Parsing_Params_t* x)
 {
 	uint8_t* xp = (uint8_t*)x;
 	dbg_printf(DBGMODE_DEBUG, "Parsing_Params Dump: ");

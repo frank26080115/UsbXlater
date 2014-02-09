@@ -100,7 +100,7 @@ USBH_Status USBH_GetDescriptor(USB_OTG_CORE_HANDLE *pcore,
                                uint16_t value_idx,
                                uint16_t intf,
                                uint8_t* buff,
-                               uint16_t length );
+                               uint16_t length);
 
 USBH_Status USBH_GetDescriptor_Blocking(USB_OTG_CORE_HANDLE *pcore,
                                USBH_DEV           *pdev,
@@ -108,13 +108,11 @@ USBH_Status USBH_GetDescriptor_Blocking(USB_OTG_CORE_HANDLE *pcore,
                                uint16_t value_idx,
                                uint16_t intf,
                                uint8_t* buff,
-                               uint16_t length,
-                               uint32_t timeout );
+                               uint16_t length);
 
 USBH_Status USBH_GetStatus_Blocking(USB_OTG_CORE_HANDLE *pcore,
                                USBH_DEV           *pdev,
-                               uint16_t* buff,
-                               uint32_t timeout);
+                               uint16_t* buff);
 
 USBH_Status USBH_Get_DevDesc(USB_OTG_CORE_HANDLE *pcore,
                              USBH_DEV *pdev,
@@ -144,8 +142,7 @@ USBH_Status USBH_ClrFeature(USB_OTG_CORE_HANDLE *pcore,
 
 USBH_Status USBH_ClrFeature_Blocking(USB_OTG_CORE_HANDLE *pcore,
                             USBH_DEV           *pdev,
-                            uint8_t ep_num, uint8_t hc_num,
-                            uint8_t timeout);
+                            uint8_t ep_num, uint8_t hc_num);
 
 USBH_Status USBH_SetInterface(USB_OTG_CORE_HANDLE *pcore,
                         USBH_DEV *pdev,

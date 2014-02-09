@@ -2,6 +2,7 @@
 #define usbh_dev_hub_h
 
 #include <usbh_lib/usbh_core.h>
+#include <usbh_dev/usbh_devio_manager.h>
 
 void USB_Hub_Hardware_Init();
 void USB_Hub_Hardware_Reset();
@@ -32,38 +33,15 @@ USBH_Status USBH_Dev_Hub_SetPortFeature(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pd
 USBH_Status USBH_Dev_Hub_GetPortStatus(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev, uint8_t port, uint16_t* wPortStatus, uint16_t* wPortChange);
 USBH_Status USBH_Dev_Hub_ClearPortFeature(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev, uint8_t port, uint16_t feature, uint8_t selector);
 
-#define HUB_MIN_POLL	10
-
-typedef enum
-{
-	HubState_IDLE = 0,
-	HubState_SEND_DATA,
-	HubState_BUSY,
-	HubState_GET_DATA,
-	HubState_SYNC,
-	HubState_POLL,
-	HubState_ERROR,
-}
-Hub_State;
+void USBH_Hub_Allow_Next(USBH_DEV *pdev);
 
 typedef struct
 {
-	Hub_State            state;
-	uint8_t              buff[64];
-	int8_t               hc_num_in;
-	int8_t               hc_num_out;
-	uint8_t              intOutEp;
-	uint8_t              intInEp;
-	uint16_t             length;
-	uint8_t              ep_addr;
-	uint16_t             poll;
-	__IO uint16_t        timer;
 	//USB_Setup_TypeDef    setup;
+	USBH_DevIO_t*        intInEpIo;
 	uint8_t              num_ports;
 	uint8_t              port_busy;
-	uint8_t              has_control;
 	USBH_DEV**           children;
-	uint8_t              start_toggle;
 }
 Hub_Data_t;
 

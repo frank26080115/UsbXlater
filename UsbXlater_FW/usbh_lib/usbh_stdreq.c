@@ -253,8 +253,7 @@ USBH_Status USBH_GetDescriptor_Blocking(USB_OTG_CORE_HANDLE *pcore,
                                uint16_t value_idx,
                                uint16_t intf,
                                uint8_t* buff,
-                               uint16_t length,
-                               uint32_t timeout)
+                               uint16_t length)
 {
   pdev->Control.setup.b.bmRequestType = USB_D2H | req_type;
   pdev->Control.setup.b.bRequest = USB_REQ_GET_DESCRIPTOR;
@@ -269,7 +268,7 @@ USBH_Status USBH_GetDescriptor_Blocking(USB_OTG_CORE_HANDLE *pcore,
     pdev->Control.setup.b.wIndex.w = intf;
   }
   pdev->Control.setup.b.wLength.w = length;
-  return USBH_CtlReq_Blocking(pcore, pdev, buff , length , timeout);
+  return USBH_CtlReq_Blocking(pcore, pdev, buff , length );
 }
 
 /**
@@ -286,15 +285,14 @@ USBH_Status USBH_GetDescriptor_Blocking(USB_OTG_CORE_HANDLE *pcore,
 */
 USBH_Status USBH_GetStatus_Blocking(USB_OTG_CORE_HANDLE *pcore,
                                USBH_DEV           *pdev,
-                               uint16_t* buff,
-                               uint32_t timeout)
+                               uint16_t* buff)
 {
   pdev->Control.setup.b.bmRequestType = USB_D2H | USB_REQ_RECIPIENT_DEVICE | USB_REQ_TYPE_STANDARD;
   pdev->Control.setup.b.bRequest = USB_REQ_GET_STATUS;
   pdev->Control.setup.b.wValue.w = 0;
   pdev->Control.setup.b.wIndex.w = 0;
   pdev->Control.setup.b.wLength.w = 2;
-  return USBH_CtlReq_Blocking(pcore, pdev, (uint8_t*)buff , 2 , timeout);
+  return USBH_CtlReq_Blocking(pcore, pdev, (uint8_t*)buff , 2 );
 }
 
 /**
@@ -404,8 +402,7 @@ USBH_Status USBH_ClrFeature(USB_OTG_CORE_HANDLE *pcore,
 USBH_Status USBH_ClrFeature_Blocking(USB_OTG_CORE_HANDLE *pcore,
                             USBH_DEV *pdev,
                             uint8_t ep_num,
-                            uint8_t hc_num,
-                            uint8_t timeout)
+                            uint8_t hc_num)
 {
 
   pdev->Control.setup.b.bmRequestType = USB_H2D |
@@ -426,7 +423,7 @@ USBH_Status USBH_ClrFeature_Blocking(USB_OTG_CORE_HANDLE *pcore,
     pcore->host.hc[hc_num].toggle_out = 0;
   }
 
-  return USBH_CtlReq_Blocking(pcore, pdev, 0 , 0 , timeout);
+  return USBH_CtlReq_Blocking(pcore, pdev, 0 , 0 );
 }
 
 /**

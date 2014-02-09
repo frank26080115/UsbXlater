@@ -2,6 +2,7 @@
 #define usbh_dev_hid_h
 
 #include <usbh_lib/usbh_core.h>
+#include <usbh_dev/usbh_devio_manager.h>
 #include <stdint.h>
 #include <hidrpt.h>
 
@@ -43,27 +44,6 @@ USBH_Status USBH_Set_Report (USB_OTG_CORE_HANDLE *pcore,
 
 extern USBH_Device_cb_TypeDef USBH_Dev_CB_HID;
 
-#define HID_MIN_POLL	10
-
-typedef enum
-{
-	HID_IDLE= 0,
-	HID_SEND_DATA,
-	HID_BUSY,
-	HID_GET_DATA,
-	HID_SYNC,
-	HID_POLL,
-	HID_ERROR,
-}
-HID_State;
-
-typedef struct HID_cb
-{
-	void  (*Init)   (USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev, uint8_t intf);
-	void  (*Decode) (USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev, uint8_t intf, uint8_t ep, uint8_t *data, uint8_t len);
-	void  (*DeInit) (USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev, uint8_t intf);
-} HID_cb_TypeDef;
-
 // there's no use for this struct in UsbXlater yet
 typedef  struct  _HID_Report
 {
@@ -91,20 +71,8 @@ HID_Report_TypeDef;
 
 typedef struct
 {
-	USBH_HIDDesc_TypeDef	HID_Desc;
-	char					start_toggle;
-	uint8_t              buff[64];
-	int8_t               hc_num_in;
-	int8_t               hc_num_out;
-	HID_State            state;
-	uint8_t              HIDIntOutEp;
-	uint8_t              HIDIntInEp;
-	uint16_t             length;
-	uint8_t              ep_addr;
-	uint16_t             poll;
-	__IO uint16_t        timer;
-	HID_cb_TypeDef       *cb;
-	HID_Rpt_Parsing_Params_t parserParams;
+	USBH_DevIO_t** io;
+	uint8_t ioIdx;
 }
 HID_Data_t;
 
@@ -114,7 +82,7 @@ HID_Data_t;
 // of an issue
 // but we leave it statically allocated instead of dynamic right now
 // just in case, it does perform better, we just have less HCs to work with
-//#define USBH_HID_ENABLE_DYNAMIC_HC_ALLOC
+#define USBH_HID_ENABLE_DYNAMIC_HC_ALLOC
 
 #define USB_HID_REQ_GET_REPORT       0x01
 #define USB_HID_GET_IDLE             0x02

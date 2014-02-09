@@ -88,7 +88,7 @@ int main(void)
 	}
 	//*/
 
-	flashfile_init();
+	//flashfile_init();
 	//flashfile_sectorDump();
 
 	led_1_on(); delay_ms(150); led_1_off();
@@ -96,7 +96,7 @@ int main(void)
 	led_3_on(); delay_ms(150); led_3_off();
 	led_4_on(); delay_ms(150); led_4_off();
 
-	kbm2c_init();
+	//kbm2c_init();
 
 	USBD_ExPullUp_Idle();
 

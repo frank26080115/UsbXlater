@@ -311,7 +311,7 @@ void l2cap_require_security_level_2_for_outgoing_sdp(){
 }
 
 static int l2cap_security_level_0_allowed_for_PSM(uint16_t psm){
-    return (psm == PSM_SDP) && (!require_security_level2_for_outgoing_sdp);
+    return (psm == PSM_SDP) && (require_security_level2_for_outgoing_sdp == 0);
 }
 
 int l2cap_send_signaling_packet(hci_con_handle_t handle, L2CAP_SIGNALING_COMMANDS cmd, uint8_t identifier, ...){
@@ -1007,7 +1007,6 @@ static void l2cap_handle_connection_request(hci_con_handle_t handle, uint8_t sig
     if (l2cap_security_level_0_allowed_for_PSM(psm)
         && hci_ssp_supported_on_both_sides(handle)
         && gap_security_level(handle) == LEVEL_0){
-
         // 0x0003 Security Block
         l2cap_register_signaling_response(handle, CONNECTION_REQUEST, sig_id, 0x0003);
         return;
@@ -1450,7 +1449,7 @@ void l2cap_register_service_internal(void *connection, btstack_packet_handler_t 
 
     // add to services list
     linked_list_add(&l2cap_services, (linked_item_t *) service);
-    
+
     // enable page scan
     hci_connectable_control(1);
 

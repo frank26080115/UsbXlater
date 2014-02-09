@@ -98,6 +98,8 @@ static void btproxy_runloop_dump_timer(void){
  * Execute run_loop once
  */
 void btproxy_runloop_execute_once(void) {
+    hci_run();
+
     data_source_t *ds;
 
     // process data sources

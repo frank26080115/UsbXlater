@@ -7,5 +7,6 @@
 
 extern USB_OTG_CORE_HANDLE * BT_USBH_CORE;
 extern USBH_DEV * BT_USBH_DEV;
+void stm32usbh_handle_raw(uint8_t packet_type, uint8_t* data, int sz);
 
 #endif
