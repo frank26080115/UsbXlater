@@ -29,6 +29,7 @@ static  STM32USBH_STATE stm32usbh_state;
 static int bytes_to_read;
 static int read_pos;
 static uint8_t hci_packet[1+HCI_PACKET_BUFFER_SIZE]; // packet type + max(acl header + acl payload, event header + event data)
+static uint32_t last_read_timestamp;
 
 static int  stm32usbh_process(struct data_source *ds);
 static void dummy_handler(uint8_t packet_type, uint8_t *packet, int size); 
@@ -44,6 +45,10 @@ static int stm32usbh_open(void *transport_config){
 	if (!hci_transport_stm32usbh) return -1;
 	hci_transport_stm32usbh->ds->process = stm32usbh_process;
 	run_loop_add_data_source(hci_transport_stm32usbh->ds);
+
+	stm32usbh_state = STM32USBH_PACKET_TYPE;
+	read_pos = 0;
+	bytes_to_read = 1;
 
 	return 0;
 }
@@ -76,6 +81,7 @@ static int stm32usbh_send_packet(uint8_t packet_type, uint8_t *packet, int size)
 			USBH_Dev_BtHci_Command(BT_USBH_CORE, BT_USBH_DEV, packet, size);
 			break;
 		case HCI_ACL_DATA_PACKET:
+			USBH_Dev_BtHci_TxData(BT_USBH_CORE, BT_USBH_DEV, packet, size);
 			break;
 		default:
 			return 1;
@@ -94,7 +100,23 @@ static void   stm32usbh_deliver_packet(void){
 	bytes_to_read = 1;
 }
 
-static void stm32usbh_statemachine(void){
+static void stm32usbh_timeout_check(void)
+{
+	if ((systick_1ms_cnt - last_read_timestamp) > 1000 && stm32usbh_state != STM32USBH_PACKET_TYPE)
+	{
+		if (hci_packet[0] == HCI_EVENT_PACKET) {
+			read_pos = hci_packet[2] + 3;
+		}
+		else if (hci_packet[0] == HCI_ACL_DATA_PACKET) {
+			read_pos = READ_BT_16( hci_packet, 3) + 5;
+		}
+		stm32usbh_deliver_packet();
+		last_read_timestamp = systick_1ms_cnt;
+	}
+}
+
+static void stm32usbh_statemachine(void)
+{
 	switch (stm32usbh_state) {
 
 		case STM32USBH_PACKET_TYPE:
@@ -131,9 +153,15 @@ static void stm32usbh_statemachine(void){
 
 void stm32usbh_handle_raw(uint8_t packet_type, uint8_t* data, int sz)
 {
+	last_read_timestamp = systick_1ms_cnt;
+
+	//dbg_printf(DBGMODE_TRACE, "hci_handle_raw t:%d  L:%d  st:%d  btr:%d  rp:%d", packet_type, sz, stm32usbh_state, bytes_to_read, read_pos);
+	//dbg_printf(DBGMODE_TRACE, "  d:{%02X %02X %02X %02X}\r\n", data[0], data[1], data[2], data[3]);
+
 	if (stm32usbh_state == STM32USBH_PACKET_TYPE && read_pos == 0) {
-		hci_packet[read_pos++] = packet_type;
-		bytes_to_read--;
+		hci_packet[0] = packet_type;
+		read_pos = 1;
+		bytes_to_read = 0;
 	}
 
 	for (int i = 0; i < sz; ) {
@@ -157,6 +185,9 @@ static int stm32usbh_can_send_packet_now(uint8_t packet_type)
 	if (BT_USBH_CORE == 0 || BT_USBH_DEV == 0) {
 		return 0;
 	}
+	if (stm32usbh_state != STM32USBH_PACKET_TYPE || read_pos != 0) {
+		return 0;
+	}
 	return USBH_Dev_BtHci_CanSendPacket(BT_USBH_CORE, BT_USBH_DEV);
 }
 
@@ -165,6 +196,7 @@ static void stm32usbh_register_packet_handler(void (*handler)(uint8_t packet_typ
 }
 
 int stm32usbh_process(struct data_source *ds) {
+	stm32usbh_timeout_check();
 	return 1;
 }
 

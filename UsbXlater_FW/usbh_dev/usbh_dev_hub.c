@@ -30,7 +30,7 @@ USBH_Device_cb_TypeDef USBH_Dev_Hub_CB = {
 	USBH_Dev_Hub_UnrecoveredError,
 };
 
-extern volatile uint8_t USBH_Dev_Reset_Timer;
+extern volatile uint32_t USBH_Dev_Reset_Timer;
 
 void USB_Hub_Hardware_Init()
 {
@@ -64,6 +64,7 @@ void USBH_Dev_Hub_DataHandler(void* p_io, uint8_t* data, uint16_t len)
 	USBH_Status errCode;
 
 	int8_t alloc = 0;
+	USBH_Dev_AllocControl(pcore, pdev);
 
 	// when a device connects or disconnects from the hub, the hub will issue an interrupt-in message
 
@@ -90,7 +91,9 @@ void USBH_Dev_Hub_DataHandler(void* p_io, uint8_t* data, uint16_t len)
 
 			if (errCode != USBH_OK) {
 				dbg_printf(DBGMODE_ERR, "USBH_Dev_Hub_Handle_InterruptIn GetPortStatus (pn %d) failed (status 0x%04X) \r\n", pn, errCode);
-				USBH_ErrorHandle(pcore, pdev, errCode);
+				if (errCode == USBH_STALL || errCode == USBH_NOT_SUPPORTED) {
+					errCode = USBH_ClrFeature_Blocking(pcore, pdev, 0, 0);
+				}
 				continue;
 			}
 
@@ -98,22 +101,37 @@ void USBH_Dev_Hub_DataHandler(void* p_io, uint8_t* data, uint16_t len)
 
 			if ((wPortStatus & (1 << HUBWPORTSTATUS_POWER_BIT)) == 0) {
 				errCode = USBH_Dev_Hub_SetPortFeature(pcore, pdev, pnp1, HUBREQ_PORT_POWER);
+				if (errCode == USBH_STALL || errCode == USBH_NOT_SUPPORTED) {
+					errCode = USBH_ClrFeature_Blocking(pcore, pdev, 0, 0);
+				}
 			}
 
 			if ((wPortStatus & (1 << HUBWPORTCHANGE_ENABLED_BIT)) == 0) {
 				errCode = USBH_Dev_Hub_SetPortFeature(pcore, pdev, pn, HUBREQ_PORT_ENABLE);
+				if (errCode == USBH_STALL || errCode == USBH_NOT_SUPPORTED) {
+					errCode = USBH_ClrFeature_Blocking(pcore, pdev, 0, 0);
+				}
 			}
 
 			if ((wPortChange & (1 << HUBWPORTCHANGE_RESET_BIT)) != 0) {
 				errCode = USBH_Dev_Hub_ClearPortFeature(pcore, pdev, pn, HUBREQ_C_PORT_RESET, 0);
+				if (errCode == USBH_STALL || errCode == USBH_NOT_SUPPORTED) {
+					errCode = USBH_ClrFeature_Blocking(pcore, pdev, 0, 0);
+				}
 			}
 
 			if ((wPortChange & (1 << HUBWPORTCHANGE_CONNSTAT_BIT)) != 0) {
 				errCode = USBH_Dev_Hub_ClearPortFeature(pcore, pdev, pn, HUBREQ_C_PORT_CONNECTION, 0);
+				if (errCode == USBH_STALL || errCode == USBH_NOT_SUPPORTED) {
+					errCode = USBH_ClrFeature_Blocking(pcore, pdev, 0, 0);
+				}
 			}
 
 			if ((wPortChange & (1 << HUBWPORTCHANGE_ENABLED_BIT)) != 0) {
 				errCode = USBH_Dev_Hub_ClearPortFeature(pcore, pdev, pn, HUBREQ_C_PORT_ENABLE, 0);
+				if (errCode == USBH_STALL || errCode == USBH_NOT_SUPPORTED) {
+					errCode = USBH_ClrFeature_Blocking(pcore, pdev, 0, 0);
+				}
 			}
 
 			if ((wPortStatus & (1 << HUBWPORTSTATUS_RESET_BIT)) != 0)
@@ -127,7 +145,7 @@ void USBH_Dev_Hub_DataHandler(void* p_io, uint8_t* data, uint16_t len)
 			{
 				if (((wPortStatus & (1 << HUBWPORTSTATUS_CURCONN_BIT)) == 0 ||
 				     (wPortStatus & (1 << HUBWPORTSTATUS_ENABLED_BIT)) == 0) &&
-				     Hub_Data->children[pn] != 0 &&
+				     Hub_Data->children[pn] != 0 && Hub_Data->children[pn]->cb != 0 &&
 				     Hub_Data->children[pn]->gState != HOST_IDLE && Hub_Data->children[pn]->gState != HOST_DEV_RESET_PENDING)
 				{
 					dbg_printf(DBGMODE_TRACE, "Hub %s disconnected device (pn %d)\r\n", USBH_Dev_DebugPrint(pdev, 0), pnp1);
@@ -144,22 +162,27 @@ void USBH_Dev_Hub_DataHandler(void* p_io, uint8_t* data, uint16_t len)
 				{
 					if ((wPortStatus & (1 << HUBWPORTSTATUS_RESET_BIT)) == 0 &&
 					    (wPortStatus & (1 << HUBWPORTSTATUS_ENABLED_BIT)) != 0 &&
-						Hub_Data->children[pn] != 0 && (Hub_Data->children[pn]->gState == HOST_DEV_RESET_PENDING || Hub_Data->children[pn]->gState == HOST_IDLE))
+						Hub_Data->children[pn] != 0 && Hub_Data->children[pn]->cb != 0 && (Hub_Data->children[pn]->gState == HOST_DEV_RESET_PENDING || Hub_Data->children[pn]->gState == HOST_IDLE))
 					{
-						((USBH_Device_cb_TypeDef*)Hub_Data->children[pn]->cb)->ResetDevice(pcore, pdev);
+						dbg_trace();
+						if (((USBH_Device_cb_TypeDef*)Hub_Data->children[pn]->cb)->ResetDevice != 0)
+							((USBH_Device_cb_TypeDef*)Hub_Data->children[pn]->cb)->ResetDevice(pcore, pdev);
 						Hub_Data->children[pn]->device_prop.speed = (wPortStatus & (1 << 9)) ? HPRT0_PRTSPD_LOW_SPEED : HPRT0_PRTSPD_FULL_SPEED; // if bit 9 is 1, then it is low speed (0x02), or else it is full speed (0x01)
-						((USBH_Device_cb_TypeDef*)Hub_Data->children[pn]->cb)->DeviceSpeedDetected(pcore, Hub_Data->children[pn], Hub_Data->children[pn]->device_prop.speed);
+						if (((USBH_Device_cb_TypeDef*)Hub_Data->children[pn]->cb)->DeviceSpeedDetected != 0)
+							((USBH_Device_cb_TypeDef*)Hub_Data->children[pn]->cb)->DeviceSpeedDetected(pcore, Hub_Data->children[pn], Hub_Data->children[pn]->device_prop.speed);
 
 						Hub_Data->children[pn]->gState = HOST_DEV_DELAY;
-						USBH_Dev_Reset_Timer = HCD_GetCurrentFrame(pcore);
+						USBH_Dev_Reset_Timer = systick_1ms_cnt;
 						Hub_Data->children[pn]->device_prop.address = 0; // new attached devices to a hub is always address 0
 						Hub_Data->port_busy = pnp1;
+						Hub_Data->intInEpIo->enabled = 0;
 						// we are allowed to pass this on to the upper state machine now, it will seem like it was attached normally
 						dbg_printf(DBGMODE_TRACE, "Hub passed new device (pn %d) to upper state machine \r\n", pnp1);
 						vcp_printf("Hub %s New Device on Port %d\r\n", USBH_Dev_DebugPrint(pdev, 0), pnp1);
 					}
 					else if (Hub_Data->children[pn] == 0)
 					{
+						dbg_trace();
 						errCode = USBH_Dev_Hub_SetPortFeature(pcore, pdev, pn, HUBREQ_PORT_RESET);
 						Hub_Data->children[pn] = calloc(1, sizeof(USBH_DEV));
 						Hub_Data->children[pn]->Parent = pdev;
@@ -172,6 +195,10 @@ void USBH_Dev_Hub_DataHandler(void* p_io, uint8_t* data, uint16_t len)
 						Hub_Data->children[pn]->port_num = pnp1;
 						Hub_Data->children[pn]->Control.hc_num_in = -1;
 						Hub_Data->children[pn]->Control.hc_num_out = -1;
+						Hub_Data->children[pn]->Control.hc_in_tgl_in = -1;
+						Hub_Data->children[pn]->Control.hc_in_tgl_out = -1;
+						Hub_Data->children[pn]->Control.hc_out_tgl_in = -1;
+						Hub_Data->children[pn]->Control.hc_out_tgl_out = -1;
 						Hub_Data->children[pn]->Control.state = CTRL_IDLE;
 						Hub_Data->children[pn]->Control.ep0size = USB_OTG_MAX_EP0_SIZE;
 						Hub_Data->children[pn]->cb = (void*)&USBH_Dev_CB_Default;
@@ -215,16 +242,24 @@ USBH_Status USBH_Dev_Hub_Task(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 	Hub_Data_t* Hub_Data = pdev->Usr_Data;
 	USBH_DevIO_Task(Hub_Data->intInEpIo);
 
-	// iterate all the ports
-	if (Hub_Data->children != 0)
+	if (Hub_Data->intInEpIo->state != UIOSTATE_WAIT_DATA)
 	{
-		for (int pn = 0; pn < Hub_Data->num_ports; pn++)
+		// iterate all the ports
+		if (Hub_Data->children != 0)
 		{
-			if (Hub_Data->children[pn] != 0) {
-				USBH_Process(pcore, Hub_Data->children[pn]);
+			for (int pn = 0; pn < Hub_Data->num_ports; pn++)
+			{
+				if (Hub_Data->children[pn] != 0 && (Hub_Data->port_busy == (pn +1) || Hub_Data->port_busy == 0)) {
+					USBH_Process(pcore, Hub_Data->children[pn]);
+				}
 			}
 		}
 	}
+
+	if (Hub_Data->port_busy == 0 && (pdev->Control.hc_num_in >= 0 || pdev->Control.hc_num_out >= 0)) {
+		USBH_Dev_FreeControl(pcore, pdev);
+	}
+
 	return USBH_OK;
 }
 
@@ -320,9 +355,8 @@ void USBH_Dev_Hub_EnumerationDone(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 
 		if ((epDesc->bmAttributes & EP_TYPE_MSK) == USB_EP_TYPE_INTR && (epDesc->bEndpointAddress & USB_EP_DIR_MSK) == USB_EP_DIR_IN)
 		{
-			if (epDesc->bInterval > 50) {
-				epDesc->bInterval = 50;
-			}
+			//if (epDesc->bInterval > 50) epDesc->bInterval = 50;
+
 			Hub_Data->intInEpIo = USBH_DevIO_Manager_New(pcore, pdev, epDesc,
 #ifdef HUB_ENABLE_DYNAMIC_HC_ALLOC
 						1
@@ -330,6 +364,8 @@ void USBH_Dev_Hub_EnumerationDone(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 						0
 #endif
 						, USBH_Dev_Hub_DataHandler, 0);
+			Hub_Data->intInEpIo->force_poll_interval = 1;
+			Hub_Data->intInEpIo->timeout = 10;
 		}
 	}
 
@@ -482,5 +518,6 @@ void USBH_Hub_Allow_Next(USBH_DEV *pdev)
 		USBH_DEV* parentHub = (USBH_DEV*)pdev->Parent;
 		Hub_Data_t* hubData = (Hub_Data_t*)parentHub->Usr_Data;
 		hubData->port_busy = 0;
+		hubData->intInEpIo->enabled = 1;
 	}
 }

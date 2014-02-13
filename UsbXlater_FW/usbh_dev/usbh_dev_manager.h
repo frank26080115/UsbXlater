@@ -7,7 +7,7 @@
 #include <stdint.h>
 #include <hidrpt.h>
 
-extern volatile uint8_t USBH_Dev_Reset_Timer;
+extern volatile uint32_t USBH_Dev_Reset_Timer;
 
 int8_t USBH_Dev_GetAvailAddress();
 void USBH_Dev_FreeAddress(uint8_t addr);

@@ -70,6 +70,7 @@
 /** @defgroup USB_CORE_Private_Variables
 * @{
 */
+USB_OTG_ISR_Statistics_t USB_OTG_ISR_Statistics;
 /**
 * @}
 */
@@ -958,6 +959,7 @@ USB_OTG_STS USB_OTG_HC_Init(USB_OTG_CORE_HANDLE *pcore , uint8_t hc_num)
   hcchar.b.lspddev = (pcore->host.hc[hc_num].speed == HPRT0_PRTSPD_LOW_SPEED);
   hcchar.b.eptype  = pcore->host.hc[hc_num].ep_type;
   hcchar.b.mps     = pcore->host.hc[hc_num].max_packet;
+  hcchar.b.multicnt = 3;
   if (pcore->host.hc[hc_num].ep_type == HCCHAR_INTR)
   {
     hcchar.b.oddfrm  = 1;
@@ -1024,9 +1026,20 @@ USB_OTG_STS USB_OTG_HC_StartXfer(USB_OTG_CORE_HANDLE *pcore , uint8_t hc_num)
     USB_OTG_WRITE_REG32(&pcore->regs.HC_REGS[hc_num]->HCDMA, (unsigned int)pcore->host.hc[hc_num].xfer_buff);
   }
 
-
   hcchar.d32 = USB_OTG_READ_REG32(&pcore->regs.HC_REGS[hc_num]->HCCHAR);
-  hcchar.b.oddfrm = USB_OTG_IsEvenFrame(pcore);
+
+  if (pcore->host.hc[hc_num].ep_is_in != 0 && (pcore->host.hc[hc_num].ep_type == EP_TYPE_INTR || pcore->host.hc[hc_num].ep_type == EP_TYPE_ISOC)) {
+    while (USB_OTG_IsEvenFrame(pcore) == 0);
+    hcchar.b.oddfrm = 1;
+  }
+  else if (pcore->host.hc[hc_num].ep_is_in == 0 && (pcore->host.hc[hc_num].ep_type == EP_TYPE_INTR || pcore->host.hc[hc_num].ep_type == EP_TYPE_ISOC)) {
+    while (USB_OTG_IsEvenFrame(pcore) != 0);
+    hcchar.b.oddfrm = 0;
+  }
+  else
+  {
+    hcchar.b.oddfrm = USB_OTG_IsEvenFrame(pcore);
+  }
 
   /* Set host channel enable */
   hcchar.b.chen = 1;
@@ -1050,6 +1063,7 @@ USB_OTG_STS USB_OTG_HC_StartXfer(USB_OTG_CORE_HANDLE *pcore , uint8_t hc_num)
         /* check if there is enough space in FIFO space */
         if(len_words > hnptxsts.b.nptxfspcavail)
         {
+          dbg_printf(DBGMODE_ERR, "otg xfer no space %d\r\n", pcore->host.hc[hc_num].ep_type);
           /* need to process data in nptxfempty interrupt */
           intmsk.b.nptxfempty = 1;
           USB_OTG_MODIFY_REG32( &pcore->regs.GREGS->GINTMSK, 0, intmsk.d32);
@@ -1064,6 +1078,7 @@ USB_OTG_STS USB_OTG_HC_StartXfer(USB_OTG_CORE_HANDLE *pcore , uint8_t hc_num)
         /* check if there is enough space in FIFO space */
         if(len_words > hptxsts.b.ptxfspcavail) /* split the transfer */
         {
+          dbg_printf(DBGMODE_ERR, "otg xfer no space %d\r\n", pcore->host.hc[hc_num].ep_type);
           /* need to process data in ptxfempty interrupt */
           intmsk.b.ptxfempty = 1;
           USB_OTG_MODIFY_REG32( &pcore->regs.GREGS->GINTMSK, 0, intmsk.d32);
@@ -2171,6 +2186,7 @@ void USB_OTG_SetEPStatus (USB_OTG_CORE_HANDLE *pcore , USB_OTG_EP *ep , uint32_t
 extern USB_OTG_CORE_HANDLE          USB_OTG_Core_dev;
 extern USB_OTG_CORE_HANDLE          USB_OTG_Core_host;
 extern USBH_DEV                     USBH_Dev;
+int OTG_FS_IRQHandler_Cnt = 0;
 
 void OTG_HS_IRQHandler(void)
 {
@@ -2185,6 +2201,7 @@ void OTG_HS_WKUP_IRQHandler(void)
 
 void OTG_FS_IRQHandler(void)
 {
+  OTG_FS_IRQHandler_Cnt++;
   USBH_OTG_ISR_Handler(&USB_OTG_Core_host);
 }
 

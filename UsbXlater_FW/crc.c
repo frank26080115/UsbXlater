@@ -99,6 +99,11 @@ uint32_t crc32_slow(uint8_t* data, int len)
 
 uint32_t (*crc32_prefered)(uint8_t*, int);
 
+uint32_t crc32_calc(uint8_t* data, int length)
+{
+	return crc32_prefered(data, length);
+}
+
 void crc_init()
 {
 	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_CRC, ENABLE);

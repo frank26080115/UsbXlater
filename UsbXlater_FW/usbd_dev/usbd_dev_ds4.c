@@ -576,12 +576,7 @@ uint8_t USBD_Dev_DS4_DataOut            (void *pcore , uint8_t epnum)
 		}
 		else if (USBD_Dev_DS_lastWValue == 0x0314)
 		{
-			if (USBD_Dev_DS_bufTemp[1] == 0x01) {
-				USBH_DS_PostedTask = USBH_DSPT_TASK_FEATURE_14_1401;
-			}
-			else if (USBD_Dev_DS_bufTemp[1] == 0x02) {
-				USBH_DS_PostedTask = USBH_DSPT_TASK_FEATURE_14_1402;
-			}
+			// TODO: should we handle this?
 		}
 		USBD_CtlSendStatus(pcore);
 	}

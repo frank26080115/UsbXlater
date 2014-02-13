@@ -2,11 +2,14 @@
 #define BTPROXY_SDP_H
 
 void bpsdp_init();
+extern void btproxy_sdp_early_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size);
 
 #ifdef INCLUDING_FROM_SDP_C
-
-static void bpsdp_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size) {
-	// TODO: filter based on channel, prepare the proper service record according to channel
+static void bpsdp_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size)
+{
+	// filter based on channel, prepare the proper service record according to channel
+	btproxy_sdp_early_packet_handler(packet_type, channel, packet, size);
+	// then call the actual sdp service
 	sdp_packet_handler(packet_type, channel, packet, size);
 }
 

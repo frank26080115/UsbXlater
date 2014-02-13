@@ -138,11 +138,11 @@ USBH_Status USBH_SetAddress(USB_OTG_CORE_HANDLE *pcore,
 
 USBH_Status USBH_ClrFeature(USB_OTG_CORE_HANDLE *pcore,
                             USBH_DEV           *pdev,
-                            uint8_t ep_num, uint8_t hc_num);
+                            uint8_t ep_num, int8_t hc_num);
 
 USBH_Status USBH_ClrFeature_Blocking(USB_OTG_CORE_HANDLE *pcore,
                             USBH_DEV           *pdev,
-                            uint8_t ep_num, uint8_t hc_num);
+                            uint8_t ep_num, int8_t hc_num);
 
 USBH_Status USBH_SetInterface(USB_OTG_CORE_HANDLE *pcore,
                         USBH_DEV *pdev,

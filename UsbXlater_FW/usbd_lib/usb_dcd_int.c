@@ -208,6 +208,10 @@ uint32_t USBD_OTG_EP1IN_ISR_Handler (USB_OTG_CORE_HANDLE *pcore)
 */
 uint32_t USBD_OTG_ISR_Handler (USB_OTG_CORE_HANDLE *pcore)
 {
+#ifdef ENABLE_USBOTG_STATISTICS
+USB_OTG_ISR_Statistics.usbh_isr_cnt++;
+#endif
+
   USB_OTG_GINTSTS_TypeDef  gintr_status;
   uint32_t retval = 0;
 
@@ -221,16 +225,25 @@ uint32_t USBD_OTG_ISR_Handler (USB_OTG_CORE_HANDLE *pcore)
 
     if (gintr_status.b.rxstsqlvl)
     {
+#ifdef ENABLE_USBOTG_STATISTICS
+USB_OTG_ISR_Statistics.usbh_rxstsqlvl++;
+#endif
       retval |= DCD_HandleRxStatusQueueLevel_ISR(pcore);
     }
 
     if (gintr_status.b.outepintr)
     {
+#ifdef ENABLE_USBOTG_STATISTICS
+USB_OTG_ISR_Statistics.outepintr++;
+#endif
       retval |= DCD_HandleOutEP_ISR(pcore);
     }
 
     if (gintr_status.b.inepint)
     {
+#ifdef ENABLE_USBOTG_STATISTICS
+USB_OTG_ISR_Statistics.inepint++;
+#endif
       retval |= DCD_HandleInEP_ISR(pcore);
     }
 
@@ -246,11 +259,17 @@ uint32_t USBD_OTG_ISR_Handler (USB_OTG_CORE_HANDLE *pcore)
 
     if (gintr_status.b.wkupintr)
     {
+#ifdef ENABLE_USBOTG_STATISTICS
+USB_OTG_ISR_Statistics.wkupintr++;
+#endif
       retval |= DCD_HandleResume_ISR(pcore);
     }
 
     if (gintr_status.b.usbsuspend)
     {
+#ifdef ENABLE_USBOTG_STATISTICS
+USB_OTG_ISR_Statistics.usbsuspend++;
+#endif
       retval |= DCD_HandleUSBSuspend_ISR(pcore);
     }
 
@@ -261,21 +280,33 @@ uint32_t USBD_OTG_ISR_Handler (USB_OTG_CORE_HANDLE *pcore)
 
     if (gintr_status.b.usbreset)
     {
+#ifdef ENABLE_USBOTG_STATISTICS
+USB_OTG_ISR_Statistics.usbreset++;
+#endif
       retval |= DCD_HandleUsbReset_ISR(pcore);
     }
 
     if (gintr_status.b.enumdone)
     {
+#ifdef ENABLE_USBOTG_STATISTICS
+USB_OTG_ISR_Statistics.enumdone++;
+#endif
       retval |= DCD_HandleEnumDone_ISR(pcore);
     }
 
     if (gintr_status.b.incomplisoin)
     {
+#ifdef ENABLE_USBOTG_STATISTICS
+USB_OTG_ISR_Statistics.usbd_incomplisoin++;
+#endif
       retval |= DCD_IsoINIncomplete_ISR(pcore);
     }
 
     if (gintr_status.b.incomplisoout)
     {
+#ifdef ENABLE_USBOTG_STATISTICS
+USB_OTG_ISR_Statistics.usbd_incomplisoout++;
+#endif
       retval |= DCD_IsoOUTIncomplete_ISR(pcore);
     }
 #ifdef VBUS_SENSING_ENABLED
@@ -436,6 +467,9 @@ static uint32_t DCD_HandleInEP_ISR(USB_OTG_CORE_HANDLE *pcore)
       diepint.d32 = DCD_ReadDevInEP(pcore , epnum); /* Get In ITR status */
       if ( diepint.b.xfercompl )
       {
+#ifdef ENABLE_USBOTG_STATISTICS
+USB_OTG_ISR_Statistics.epin_xfercompl[epnum]++;
+#endif
         fifoemptymsk = 0x1 << epnum;
         USB_OTG_MODIFY_REG32(&pcore->regs.DREGS->DIEPEMPMSK, fifoemptymsk, 0);
         CLEAR_IN_EP_INTR(epnum, xfercompl);
@@ -453,22 +487,37 @@ static uint32_t DCD_HandleInEP_ISR(USB_OTG_CORE_HANDLE *pcore)
       }
       if ( diepint.b.timeout )
       {
+#ifdef ENABLE_USBOTG_STATISTICS
+USB_OTG_ISR_Statistics.epin_timeout[epnum]++;
+#endif
         CLEAR_IN_EP_INTR(epnum, timeout);
       }
       if (diepint.b.intktxfemp)
       {
+#ifdef ENABLE_USBOTG_STATISTICS
+USB_OTG_ISR_Statistics.epin_intktxfemp[epnum]++;
+#endif
         CLEAR_IN_EP_INTR(epnum, intktxfemp);
       }
       if (diepint.b.inepnakeff)
       {
+#ifdef ENABLE_USBOTG_STATISTICS
+USB_OTG_ISR_Statistics.epin_inepnakeff[epnum]++;
+#endif
         CLEAR_IN_EP_INTR(epnum, inepnakeff);
       }
       if ( diepint.b.epdisabled )
       {
+#ifdef ENABLE_USBOTG_STATISTICS
+USB_OTG_ISR_Statistics.epin_epdisabled[epnum]++;
+#endif
         CLEAR_IN_EP_INTR(epnum, epdisabled);
       }
       if (diepint.b.emptyintr)
       {
+#ifdef ENABLE_USBOTG_STATISTICS
+USB_OTG_ISR_Statistics.epin_emptyintr[epnum]++;
+#endif
 
         DCD_WriteEmptyTxFifo(pcore , epnum);
 
@@ -510,6 +559,10 @@ static uint32_t DCD_HandleOutEP_ISR(USB_OTG_CORE_HANDLE *pcore)
       /* Transfer complete */
       if ( doepint.b.xfercompl )
       {
+#ifdef ENABLE_USBOTG_STATISTICS
+USB_OTG_ISR_Statistics.epout_xfercompl[epnum]++;
+#endif
+
         /* Clear the bit in DOEPINTn for this interrupt */
         CLEAR_OUT_EP_INTR(epnum, xfercompl);
         if (pcore->cfg.dma_enable == 1)
@@ -535,13 +588,18 @@ static uint32_t DCD_HandleOutEP_ISR(USB_OTG_CORE_HANDLE *pcore)
       /* Endpoint disable  */
       if ( doepint.b.epdisabled )
       {
+#ifdef ENABLE_USBOTG_STATISTICS
+USB_OTG_ISR_Statistics.epout_epdisabled[epnum]++;
+#endif
         /* Clear the bit in DOEPINTn for this interrupt */
         CLEAR_OUT_EP_INTR(epnum, epdisabled);
       }
       /* Setup Phase Done (control EPs) */
       if ( doepint.b.setup )
       {
-
+#ifdef ENABLE_USBOTG_STATISTICS
+USB_OTG_ISR_Statistics.epout_setup[epnum]++;
+#endif
         /* inform the upper layer that a setup packet is available */
         /* SETUP COMPLETE */
         USBD_DCD_INT_fops->SetupStage(pcore);
@@ -596,6 +654,10 @@ static uint32_t DCD_HandleRxStatusQueueLevel_ISR(USB_OTG_CORE_HANDLE *pcore)
   status.d32 = USB_OTG_READ_REG32( &pcore->regs.GREGS->GRXSTSP );
 
   ep = &pcore->dev.out_ep[status.b.epnum];
+
+#ifdef ENABLE_USBOTG_STATISTICS
+USB_OTG_ISR_Statistics.usbd_rx_qlvl[status.b.epnum][status.b.pktsts]++;
+#endif
 
   switch (status.b.pktsts)
   {

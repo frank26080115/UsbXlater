@@ -119,6 +119,13 @@ void hci_dump_set_max_packets(int packets){
 #endif
 
 void hci_dump_packet(uint8_t packet_type, uint8_t in, uint8_t *packet, uint16_t len) {
+#ifdef ENABLE_DBGPRINTF_HCI_DUMP_PACKET
+	dbg_printf(DBGMODE_DEBUG, "pkt[type:0x%02X len:%d]:", packet_type, len);
+	for (int i = 0; i < len; i++) {
+		dbg_printf(DBGMODE_DEBUG, "%02X ", packet[i]);
+	}
+	dbg_printf(DBGMODE_DEBUG, "\r\n");
+#endif
 #ifndef EMBEDDED
 
     if (dump_file < 0) return; // not activated yet

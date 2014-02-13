@@ -154,12 +154,16 @@ typedef struct _Ctrl
 {
   int8_t                hc_num_in;
   int8_t                hc_num_out;
+  int8_t                hc_in_tgl_in;
+  int8_t                hc_in_tgl_out;
+  int8_t                hc_out_tgl_in;
+  int8_t                hc_out_tgl_out;
   uint8_t               ep0size;
   uint8_t               *buff;
   uint16_t              length;
   uint8_t               errorcount;
-  uint16_t              timer;
-  uint16_t              timeout;
+  uint32_t              timer;
+  uint32_t              timeout;
   CTRL_STATUS           status;
   USB_Setup_TypeDef     setup;
   CTRL_State            state;

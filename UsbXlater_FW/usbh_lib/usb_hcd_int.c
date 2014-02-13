@@ -117,6 +117,10 @@ static uint32_t USB_OTG_USBH_handle_IncompletePeriodicXfer_ISR (USB_OTG_CORE_HAN
 
 uint32_t USBH_OTG_ISR_Handler (USB_OTG_CORE_HANDLE *pcore)
 {
+#ifdef ENABLE_USBOTG_STATISTICS
+  USB_OTG_ISR_Statistics.usbh_isr_cnt++;
+#endif
+
   USB_OTG_GINTSTS_TypeDef  gintsts;
   uint32_t retval = 0;
 
@@ -138,6 +142,9 @@ uint32_t USBH_OTG_ISR_Handler (USB_OTG_CORE_HANDLE *pcore)
 
     if (gintsts.b.rxstsqlvl)
     {
+#ifdef ENABLE_USBOTG_STATISTICS
+USB_OTG_ISR_Statistics.usbh_rxstsqlvl++;
+#endif
       retval |= USB_OTG_USBH_handle_rx_qlvl_ISR (pcore);
     }
 
@@ -153,11 +160,17 @@ uint32_t USBH_OTG_ISR_Handler (USB_OTG_CORE_HANDLE *pcore)
 
     if (gintsts.b.hcintr)
     {
+#ifdef ENABLE_USBOTG_STATISTICS
+USB_OTG_ISR_Statistics.hcintr++;
+#endif
       retval |= USB_OTG_USBH_handle_hc_ISR (pcore);
     }
 
     if (gintsts.b.portintr)
     {
+#ifdef ENABLE_USBOTG_STATISTICS
+USB_OTG_ISR_Statistics.portintr++;
+#endif
       retval |= USB_OTG_USBH_handle_port_ISR (pcore);
     }
 
@@ -169,6 +182,9 @@ uint32_t USBH_OTG_ISR_Handler (USB_OTG_CORE_HANDLE *pcore)
 
     if (gintsts.b.incomplisoout)
     {
+#ifdef ENABLE_USBOTG_STATISTICS
+USB_OTG_ISR_Statistics.usbh_incomplisoout++;
+#endif
       retval |= USB_OTG_USBH_handle_IncompletePeriodicXfer_ISR (pcore);
     }
 
@@ -272,6 +288,10 @@ static uint32_t USB_OTG_USBH_handle_nptxfempty_ISR (USB_OTG_CORE_HANDLE *pcore)
 
   hnptxsts.d32 = USB_OTG_READ_REG32(&pcore->regs.GREGS->HNPTXSTS);
 
+#ifdef ENABLE_USBOTG_STATISTICS
+USB_OTG_ISR_Statistics.usbh_nptxfempty[hnptxsts.b.nptxqtop.chnum]++;
+#endif
+
   len_words = (pcore->host.hc[hnptxsts.b.nptxqtop.chnum].xfer_len + 3) / 4;
 
   while ((hnptxsts.b.nptxfspcavail > len_words)&&
@@ -319,6 +339,10 @@ static uint32_t USB_OTG_USBH_handle_ptxfempty_ISR (USB_OTG_CORE_HANDLE *pcore)
   uint16_t                     len_words , len;
 
   hptxsts.d32 = USB_OTG_READ_REG32(&pcore->regs.HREGS->HPTXSTS);
+
+#ifdef ENABLE_USBOTG_STATISTICS
+USB_OTG_ISR_Statistics.usbh_ptxfempty[hptxsts.b.ptxqtop.chnum]++;
+#endif
 
   len_words = (pcore->host.hc[hptxsts.b.ptxqtop.chnum].xfer_len + 3) / 4;
 
@@ -478,21 +502,33 @@ uint32_t USB_OTG_USBH_handle_hc_n_Out_ISR (USB_OTG_CORE_HANDLE *pcore , uint32_t
 
   if (hcint.b.ahberr)
   {
+#ifdef ENABLE_USBOTG_STATISTICS
+USB_OTG_ISR_Statistics.hcout_ahberr[num]++;
+#endif
     CLEAR_HC_INT(hcreg ,ahberr);
     UNMASK_HOST_INT_CHH (num);
   }
   else if (hcint.b.ack)
   {
+#ifdef ENABLE_USBOTG_STATISTICS
+USB_OTG_ISR_Statistics.hcout_ack[num]++;
+#endif
     CLEAR_HC_INT(hcreg , ack);
   }
   else if (hcint.b.frmovrun)
   {
+#ifdef ENABLE_USBOTG_STATISTICS
+USB_OTG_ISR_Statistics.hcout_ahberr[num]++;
+#endif
     UNMASK_HOST_INT_CHH (num);
     USB_OTG_HC_Halt(pcore, num);
     CLEAR_HC_INT(hcreg ,frmovrun);
   }
   else if (hcint.b.xfercompl)
   {
+#ifdef ENABLE_USBOTG_STATISTICS
+USB_OTG_ISR_Statistics.hcout_xfercompl[num]++;
+#endif
     pcore->host.ErrCnt[num] = 0;
     UNMASK_HOST_INT_CHH (num);
     USB_OTG_HC_Halt(pcore, num);
@@ -502,6 +538,9 @@ uint32_t USB_OTG_USBH_handle_hc_n_Out_ISR (USB_OTG_CORE_HANDLE *pcore , uint32_t
 
   else if (hcint.b.stall)
   {
+#ifdef ENABLE_USBOTG_STATISTICS
+USB_OTG_ISR_Statistics.hcout_stall[num]++;
+#endif
     CLEAR_HC_INT(hcreg , stall);
     UNMASK_HOST_INT_CHH (num);
     USB_OTG_HC_Halt(pcore, num);
@@ -510,6 +549,9 @@ uint32_t USB_OTG_USBH_handle_hc_n_Out_ISR (USB_OTG_CORE_HANDLE *pcore , uint32_t
 
   else if (hcint.b.nak)
   {
+#ifdef ENABLE_USBOTG_STATISTICS
+USB_OTG_ISR_Statistics.hcout_nak[num]++;
+#endif
     pcore->host.ErrCnt[num] = 0;
     UNMASK_HOST_INT_CHH (num);
     USB_OTG_HC_Halt(pcore, num);
@@ -519,6 +561,9 @@ uint32_t USB_OTG_USBH_handle_hc_n_Out_ISR (USB_OTG_CORE_HANDLE *pcore , uint32_t
 
   else if (hcint.b.xacterr)
   {
+#ifdef ENABLE_USBOTG_STATISTICS
+USB_OTG_ISR_Statistics.hcout_xacterr[num]++;
+#endif
     UNMASK_HOST_INT_CHH (num);
     USB_OTG_HC_Halt(pcore, num);
     pcore->host.ErrCnt[num] ++;
@@ -527,6 +572,9 @@ uint32_t USB_OTG_USBH_handle_hc_n_Out_ISR (USB_OTG_CORE_HANDLE *pcore , uint32_t
   }
   else if (hcint.b.nyet)
   {
+#ifdef ENABLE_USBOTG_STATISTICS
+USB_OTG_ISR_Statistics.hcout_nyet[num]++;
+#endif
     pcore->host.ErrCnt[num] = 0;
     UNMASK_HOST_INT_CHH (num);
     USB_OTG_HC_Halt(pcore, num);
@@ -535,7 +583,9 @@ uint32_t USB_OTG_USBH_handle_hc_n_Out_ISR (USB_OTG_CORE_HANDLE *pcore , uint32_t
   }
   else if (hcint.b.datatglerr)
   {
-
+#ifdef ENABLE_USBOTG_STATISTICS
+USB_OTG_ISR_Statistics.hcout_datatglerr[num]++;
+#endif
     UNMASK_HOST_INT_CHH (num);
     USB_OTG_HC_Halt(pcore, num);
     CLEAR_HC_INT(hcreg , nak);
@@ -545,6 +595,9 @@ uint32_t USB_OTG_USBH_handle_hc_n_Out_ISR (USB_OTG_CORE_HANDLE *pcore , uint32_t
   }
   else if (hcint.b.chhltd)
   {
+#ifdef ENABLE_USBOTG_STATISTICS
+USB_OTG_ISR_Statistics.hcout_chhltd[num]++;
+#endif
     MASK_HOST_INT_CHH (num);
 
     if(pcore->host.HC_Status[num] == HC_XFRC)
@@ -574,7 +627,7 @@ uint32_t USB_OTG_USBH_handle_hc_n_Out_ISR (USB_OTG_CORE_HANDLE *pcore , uint32_t
     }
     else if(pcore->host.HC_Status[num] == HC_XACTERR)
     {
-      if (pcore->host.ErrCnt[num] == 3)
+      if (pcore->host.ErrCnt[num] >= 3)
       {
         pcore->host.URB_State[num] = URB_ERROR;
         pcore->host.ErrCnt[num] = 0;
@@ -583,6 +636,15 @@ uint32_t USB_OTG_USBH_handle_hc_n_Out_ISR (USB_OTG_CORE_HANDLE *pcore , uint32_t
     CLEAR_HC_INT(hcreg , chhltd);
   }
 
+  if (hcint.b.bblerr)
+  {
+#ifdef ENABLE_USBOTG_STATISTICS
+USB_OTG_ISR_Statistics.hcout_bblerr[num]++;
+#endif
+    CLEAR_HC_INT(hcreg , bblerr);
+    UNMASK_HOST_INT_CHH (num);
+    USB_OTG_HC_Halt(pcore, num);
+  }
 
   return 1;
 }
@@ -615,16 +677,25 @@ uint32_t USB_OTG_USBH_handle_hc_n_In_ISR (USB_OTG_CORE_HANDLE *pcore , uint32_t 
 
   if (hcint.b.ahberr)
   {
+#ifdef ENABLE_USBOTG_STATISTICS
+USB_OTG_ISR_Statistics.hcin_ahberr[num]++;
+#endif
     CLEAR_HC_INT(hcreg ,ahberr);
     UNMASK_HOST_INT_CHH (num);
   }
   else if (hcint.b.ack)
   {
+#ifdef ENABLE_USBOTG_STATISTICS
+USB_OTG_ISR_Statistics.hcin_ack[num]++;
+#endif
     CLEAR_HC_INT(hcreg ,ack);
   }
 
   else if (hcint.b.stall)
   {
+#ifdef ENABLE_USBOTG_STATISTICS
+USB_OTG_ISR_Statistics.hcin_stall[num]++;
+#endif
     UNMASK_HOST_INT_CHH (num);
     pcore->host.HC_Status[num] = HC_STALL;
     CLEAR_HC_INT(hcreg , nak);   /* Clear the NAK Condition */
@@ -636,7 +707,9 @@ uint32_t USB_OTG_USBH_handle_hc_n_In_ISR (USB_OTG_CORE_HANDLE *pcore , uint32_t 
   }
   else if (hcint.b.datatglerr)
   {
-
+#ifdef ENABLE_USBOTG_STATISTICS
+USB_OTG_ISR_Statistics.hcin_datatglerr[num]++;
+#endif
     UNMASK_HOST_INT_CHH (num);
     USB_OTG_HC_Halt(pcore, num);
     CLEAR_HC_INT(hcreg , nak);
@@ -646,6 +719,9 @@ uint32_t USB_OTG_USBH_handle_hc_n_In_ISR (USB_OTG_CORE_HANDLE *pcore , uint32_t 
 
   if (hcint.b.frmovrun)
   {
+#ifdef ENABLE_USBOTG_STATISTICS
+USB_OTG_ISR_Statistics.hcin_frmovrun[num]++;
+#endif
     UNMASK_HOST_INT_CHH (num);
     USB_OTG_HC_Halt(pcore, num);
     CLEAR_HC_INT(hcreg ,frmovrun);
@@ -653,7 +729,9 @@ uint32_t USB_OTG_USBH_handle_hc_n_In_ISR (USB_OTG_CORE_HANDLE *pcore , uint32_t 
 
   else if (hcint.b.xfercompl)
   {
-
+#ifdef ENABLE_USBOTG_STATISTICS
+USB_OTG_ISR_Statistics.hcin_xfercompl[num]++;
+#endif
     if (pcore->cfg.dma_enable == 1)
     {
       hctsiz.d32 = USB_OTG_READ_REG32(&pcore->regs.HC_REGS[num]->HCTSIZ);
@@ -664,8 +742,9 @@ uint32_t USB_OTG_USBH_handle_hc_n_In_ISR (USB_OTG_CORE_HANDLE *pcore , uint32_t 
     pcore->host.ErrCnt [num]= 0;
     CLEAR_HC_INT(hcreg , xfercompl);
 
-    if ((hcchar.b.eptype == EP_TYPE_CTRL)||
-        (hcchar.b.eptype == EP_TYPE_BULK))
+    if ((hcchar.b.eptype == EP_TYPE_CTRL)
+    //|| (hcchar.b.eptype == EP_TYPE_BULK)
+       )
     {
       UNMASK_HOST_INT_CHH (num);
       USB_OTG_HC_Halt(pcore, num);
@@ -683,6 +762,9 @@ uint32_t USB_OTG_USBH_handle_hc_n_In_ISR (USB_OTG_CORE_HANDLE *pcore , uint32_t 
   }
   else if (hcint.b.chhltd)
   {
+#ifdef ENABLE_USBOTG_STATISTICS
+USB_OTG_ISR_Statistics.hcin_chhltd[num]++;
+#endif
     MASK_HOST_INT_CHH (num);
 
     if(pcore->host.HC_Status[num] == HC_XFRC)
@@ -702,9 +784,16 @@ uint32_t USB_OTG_USBH_handle_hc_n_In_ISR (USB_OTG_CORE_HANDLE *pcore , uint32_t 
       pcore->host.URB_State[num] = URB_ERROR;
 
     }
-    else if(hcchar.b.eptype == EP_TYPE_INTR)
+    else
     {
-      pcore->host.hc[num].toggle_in ^= 1;
+      if (pcore->host.HC_Status[num] == HC_NAK)
+      {
+        pcore->host.URB_State[num] = URB_NOTREADY;
+      }
+      if(hcchar.b.eptype == EP_TYPE_INTR)
+      {
+        pcore->host.hc[num].toggle_in ^= 1;
+      }
     }
 
     CLEAR_HC_INT(hcreg , chhltd);
@@ -712,6 +801,9 @@ uint32_t USB_OTG_USBH_handle_hc_n_In_ISR (USB_OTG_CORE_HANDLE *pcore , uint32_t 
   }
   else if (hcint.b.xacterr)
   {
+#ifdef ENABLE_USBOTG_STATISTICS
+USB_OTG_ISR_Statistics.hcin_xacterr[num]++;
+#endif
     UNMASK_HOST_INT_CHH (num);
     pcore->host.ErrCnt[num] ++;
     pcore->host.HC_Status[num] = HC_XACTERR;
@@ -721,13 +813,17 @@ uint32_t USB_OTG_USBH_handle_hc_n_In_ISR (USB_OTG_CORE_HANDLE *pcore , uint32_t 
   }
   else if (hcint.b.nak)
   {
+#ifdef ENABLE_USBOTG_STATISTICS
+USB_OTG_ISR_Statistics.hcin_nak[num]++;
+#endif
     if(hcchar.b.eptype == EP_TYPE_INTR)
     {
       UNMASK_HOST_INT_CHH (num);
       USB_OTG_HC_Halt(pcore, num);
     }
-    else if  ((hcchar.b.eptype == EP_TYPE_CTRL)||
-              (hcchar.b.eptype == EP_TYPE_BULK))
+    else if  ((hcchar.b.eptype == EP_TYPE_CTRL)
+           || (hcchar.b.eptype == EP_TYPE_BULK)
+              )
     {
       /* re-activate the channel  */
       hcchar.b.chen = 1;
@@ -735,12 +831,20 @@ uint32_t USB_OTG_USBH_handle_hc_n_In_ISR (USB_OTG_CORE_HANDLE *pcore , uint32_t 
       USB_OTG_WRITE_REG32(&pcore->regs.HC_REGS[num]->HCCHAR, hcchar.d32);
     }
     pcore->host.HC_Status[num] = HC_NAK;
+    if (hcchar.b.eptype == EP_TYPE_BULK && pcore->host.URB_State[num] == URB_IDLE) {
+      pcore->host.URB_State[num] = URB_NOTREADY;
+    }
     CLEAR_HC_INT(hcreg , nak);
   }
 
   if (hcint.b.bblerr)
   {
+#ifdef ENABLE_USBOTG_STATISTICS
+USB_OTG_ISR_Statistics.hcin_bblerr[num]++;
+#endif
     CLEAR_HC_INT(hcreg , bblerr);
+    UNMASK_HOST_INT_CHH (num);
+    USB_OTG_HC_Halt(pcore, num);
   }
 
   return 1;
@@ -773,6 +877,10 @@ static uint32_t USB_OTG_USBH_handle_rx_qlvl_ISR (USB_OTG_CORE_HANDLE *pcore)
   grxsts.d32 = USB_OTG_READ_REG32(&pcore->regs.GREGS->GRXSTSP);
   channelnum = grxsts.b.chnum;
   hcchar.d32 = USB_OTG_READ_REG32(&pcore->regs.HC_REGS[channelnum]->HCCHAR);
+
+#ifdef ENABLE_USBOTG_STATISTICS
+USB_OTG_ISR_Statistics.usbh_rx_qlvl[channelnum][grxsts.b.pktsts]++;
+#endif
 
   switch (grxsts.b.pktsts)
   {
@@ -826,12 +934,8 @@ static uint32_t USB_OTG_USBH_handle_rx_qlvl_ISR (USB_OTG_CORE_HANDLE *pcore)
 #endif /* __CC_ARM */
 static uint32_t USB_OTG_USBH_handle_IncompletePeriodicXfer_ISR (USB_OTG_CORE_HANDLE *pcore)
 {
-
   USB_OTG_GINTSTS_TypeDef       gintsts;
   USB_OTG_HCCHAR_TypeDef        hcchar;
-
-
-
 
   hcchar.d32 = USB_OTG_READ_REG32(&pcore->regs.HC_REGS[0]->HCCHAR);
   hcchar.b.chen = 1;

@@ -592,7 +592,7 @@ void l2cap_run(void){
         
         l2cap_channel_t * channel = (l2cap_channel_t *) it;
         
-        // log_info("l2cap_run: state %u, var 0x%02x\n", channel->state, channel->state_var);
+        log_info("l2cap_run: state %u, var 0x%02x\n", channel->state, channel->state_var);
         
         
         switch (channel->state){
@@ -1004,7 +1004,7 @@ static void l2cap_handle_connection_request(hci_con_handle_t handle, uint8_t sig
     }
 
     // reject connection (0x03 security block) and disconnect if both have SSP, connection is not encrypted and PSM != SDP
-    if (l2cap_security_level_0_allowed_for_PSM(psm)
+    if (!l2cap_security_level_0_allowed_for_PSM(psm)
         && hci_ssp_supported_on_both_sides(handle)
         && gap_security_level(handle) == LEVEL_0){
         // 0x0003 Security Block

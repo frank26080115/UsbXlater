@@ -287,6 +287,61 @@ typedef struct USB_OTG_handle
 }
 USB_OTG_CORE_HANDLE , *PUSB_OTG_CORE_HANDLE;
 
+typedef struct
+{
+	int usbh_isr_cnt;
+	int usbd_isr_cnt;
+	int usbh_rxstsqlvl;
+	int usbd_rxstsqlvl;
+	int hcintr;
+	int portintr;
+	int outepintr;
+	int inepint;
+	int wkupintr;
+	int usbsuspend;
+	int usbreset;
+	int enumdone;
+	int usbd_incomplisoin;
+	int usbd_incomplisoout;
+	int usbh_incomplisoout;
+	int usbh_ptxfempty[13];
+	int usbh_nptxfempty[13];
+	int hcout_ack[13];
+	int hcout_ahberr[13];
+	int hcout_xfercompl[13];
+	int hcout_stall[13];
+	int hcout_nak[13];
+	int hcout_xacterr[13];
+	int hcout_nyet[13];
+	int hcout_datatglerr[13];
+	int hcout_bblerr[13];
+	int hcout_chhltd[13];
+	int hcin_ack[13];
+	int hcin_ahberr[13];
+	int hcin_xfercompl[13];
+	int hcin_stall[13];
+	int hcin_nak[13];
+	int hcin_xacterr[13];
+	int hcin_nyet[13];
+	int hcin_datatglerr[13];
+	int hcin_bblerr[13];
+	int hcin_chhltd[13];
+	int hcin_frmovrun[13];
+	int epin_xfercompl[16];
+	int epin_timeout[16];
+	int epin_intktxfemp[16];
+	int epin_inepnakeff[16];
+	int epin_epdisabled[16];
+	int epin_emptyintr[16];
+	int epout_xfercompl[16];
+	int epout_epdisabled[16];
+	int epout_setup[16];
+	int usbh_rx_qlvl[13][16];
+	int usbd_rx_qlvl[16][16];
+}
+USB_OTG_ISR_Statistics_t;
+extern USB_OTG_ISR_Statistics_t USB_OTG_ISR_Statistics;
+
 /**
   * @}
   */

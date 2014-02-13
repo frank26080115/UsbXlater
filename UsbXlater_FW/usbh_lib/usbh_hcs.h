@@ -88,6 +88,7 @@
   */
 
 int8_t USBH_Free_Channel  (USB_OTG_CORE_HANDLE *pcore, int8_t* idx);
+int8_t USBH_Free_Channel_Without_Halt  (USB_OTG_CORE_HANDLE *pcore, int8_t* idx);
 
 uint8_t USBH_DeAllocate_AllChannel  (USB_OTG_CORE_HANDLE *pcore);
 

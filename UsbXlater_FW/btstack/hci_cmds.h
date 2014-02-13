@@ -112,6 +112,7 @@ extern "C" {
 #define HCI_EVENT_MAX_SLOTS_CHANGED			               0x1B
 #define HCI_EVENT_READ_CLOCK_OFFSET_COMPLETE               0x1C
 #define HCI_EVENT_PACKET_TYPE_CHANGED                      0x1D
+#define HCI_EVENT_PAGE_SCAN_REPETITION_MODE_CHANGE         0x20
 #define HCI_EVENT_INQUIRY_RESULT_WITH_RSSI		      	   0x22
 #define HCI_EVENT_EXTENDED_INQUIRY_RESPONSE                0x2F
 #define HCI_EVENT_IO_CAPABILITY_REQUEST                    0x31
@@ -120,6 +121,7 @@ extern "C" {
 #define HCI_EVENT_USER_PASSKEY_REQUEST             		   0x34
 #define HCI_EVENT_REMOTE_OOB_DATA_REQUEST				   0x35
 #define HCI_EVENT_SIMPLE_PAIRING_COMPLETE				   0x36
+#define HCI_EVENT_LINK_SUPERVISION_TIMEOUT_CHANGED         0x38
 #define HCI_EVENT_LE_META                                  0x3E
 #define HCI_EVENT_VENDOR_SPECIFIC				           0xFF
 

@@ -1,4 +1,7 @@
 #include "usbh_dev_dualshock.h"
+#include <ds4_emu.h>
+#include <usbh_dev/usbh_dev_manager.h>
+#include <usbh_dev/usbh_devio_manager.h>
 #include <usbh_dev/usbh_dev_hid.h>
 #include <usbh_lib/usbh_core.h>
 #include <usbh_lib/usbh_ioreq.h>
@@ -9,145 +12,147 @@
 #include <stdlib.h>
 #include <string.h>
 
-USB_OTG_CORE_HANDLE* USBH_DSPT_core;
-USBH_DEV*            USBH_DSPT_dev;
+uint8_t USBH_DS_Buffer[64];
 
 char USBH_DS3_Available = 0;
 char USBH_DS4_Available = 0;
 char USBH_DS3_NewData = 0;
 char USBH_DS4_NewData = 0;
-uint8_t USBH_DS_Buffer[64];
-USBH_DS_task_t USBH_DS_PostedTask = 0;
 
-void USBH_DS4_Feature14_1401(void);
-void USBH_DS4_Feature14_1402(void);
+void USBH_DS4_Init_Handler(USB_OTG_CORE_HANDLE* pcore, USBH_DEV* pdev)
+{
+	HID_Data_t* HID_Data = pdev->Usr_Data;
+	uint8_t numIntf = pdev->device_prop.Cfg_Desc.bNumInterfaces;
+
+	for (int i = 0; i < numIntf; i++) {
+		if (HID_Data->io[i] != 0) {
+			//HID_Data->io[i]->timeout = 100;
+			HID_Data->io[i]->enabled = 0;
+			//HID_Data->io[i]->priority = 10000;
+		}
+	}
+
+	DS4EMU_State &= ~(
+			EMUSTATE_HAS_DS4_BDADDR |
+			EMUSTATE_GIVEN_PS4_BDADDR |
+			EMUSTATE_HAS_MFG_DATE |
+			EMUSTATE_HAS_REPORT_02 |
+			EMUSTATE_GIVEN_DS4_1401 |
+			EMUSTATE_GIVEN_DS4_1402 |
+		0 );
+	DS4EMU_State |= EMUSTATE_IS_DS4_USB_CONNECTED;
+}
+
+void USBH_DS4_Task(USB_OTG_CORE_HANDLE* pcore, USBH_DEV* pdev)
+{
+	HID_Data_t* HID_Data = pdev->Usr_Data;
+	USBH_Status status;
+	int len;
+	USBH_Dev_AllocControl(pcore, pdev);
+	if ((DS4EMU_State & EMUSTATE_HAS_DS4_BDADDR) == 0)
+	{
+		len = 3 * 5;
+		if(status = USBH_Get_Report(pcore, pdev, 0, 0x03, 0x12, len + 1, USBH_DS_Buffer) == USBH_OK)
+		{
+			DS4EMU_State |= EMUSTATE_HAS_DS4_BDADDR;
+			memcpy(ds4_bdaddr, &USBH_DS_Buffer[1], BD_ADDR_LEN);
+			dbg_printf(DBGMODE_DEBUG, "DS4 %s xfer BDADDR ", USBH_Dev_DebugPrint(pdev, 0));
+			dbg_printf(DBGMODE_DEBUG, "%s\r\n", print_bdaddr(ds4_bdaddr));
+		}
+		return;
+	}
+	if ((DS4EMU_State & EMUSTATE_HAS_MFG_DATE) == 0)
+	{
+		len = DS4_MFG_DATE_LEN;
+		if(status = USBH_Get_Report(pcore, pdev, 0, 0x03, 0xA3, len + 1, USBH_DS_Buffer) == USBH_OK)
+		{
+			DS4EMU_State |= EMUSTATE_HAS_MFG_DATE;
+			memcpy(ds4_mfg_date, &USBH_DS_Buffer[1], len);
+			dbg_printf(DBGMODE_DEBUG, "DS4 %s xfer MFG date\r\n", USBH_Dev_DebugPrint(pdev, 0));
+		}
+		return;
+	}
+	if ((DS4EMU_State & EMUSTATE_HAS_REPORT_02) == 0)
+	{
+		len = DS4_REPORT_02_LEN - 1;
+		if(status = USBH_Get_Report(pcore, pdev, 0, 0x03, 0x02, len + 1, USBH_DS_Buffer) == USBH_OK)
+		{
+			DS4EMU_State |= EMUSTATE_HAS_REPORT_02;
+			memcpy(ds4_report02, &USBH_DS_Buffer[1], len);
+			dbg_printf(DBGMODE_DEBUG, "DS4 %s xfer report 0x02\r\n", USBH_Dev_DebugPrint(pdev, 0));
+		}
+		return;
+	}
+	if ((DS4EMU_State & EMUSTATE_GIVEN_PS4_BDADDR) == 0 && (DS4EMU_State & EMUSTATE_HAS_BT_BDADDR) != 0)
+	{
+		len = BD_ADDR_LEN + LINK_KEY_LEN;
+		USBH_DS_Buffer[0] = 0x13;
+		memcpy(&USBH_DS_Buffer[1], hci_local_bd_addr(), BD_ADDR_LEN);
+		memcpy(&USBH_DS_Buffer[1 + BD_ADDR_LEN], ds4_link_key, LINK_KEY_LEN);
+		if(status = USBH_Set_Report_Blocking(pcore, pdev, 0, 0x03, USBH_DS_Buffer[0], len + 1, USBH_DS_Buffer) == USBH_OK)
+		{
+			DS4EMU_State |= EMUSTATE_GIVEN_PS4_BDADDR;
+			dbg_printf(DBGMODE_DEBUG, "DS4 %s given BT dongle's BDADDR\r\n", USBH_Dev_DebugPrint(pdev, 0));
+		}
+		return;
+	}
+	if ((DS4EMU_State & EMUSTATE_GIVEN_PS4_BDADDR) != 0 && (DS4EMU_State & EMUSTATE_HAS_BT_BDADDR) != 0 && (DS4EMU_State & EMUSTATE_GIVEN_DS4_1401) == 0)
+	{
+		len = 16;
+		memset(USBH_DS_Buffer, 0, len + 1);
+		USBH_DS_Buffer[0] = 0x14;
+		USBH_DS_Buffer[1] = 0x01;
+		if(status = USBH_Set_Report_Blocking(pcore, pdev, 0, 0x03, USBH_DS_Buffer[0], len + 1, USBH_DS_Buffer) == USBH_OK)
+		{
+			DS4EMU_State |= EMUSTATE_GIVEN_DS4_1401;
+			dbg_printf(DBGMODE_DEBUG, "DS4 %s sent 0x14 0x01\r\n", USBH_Dev_DebugPrint(pdev, 0));
+		}
+		return;
+	}
+	if ((DS4EMU_State & EMUSTATE_GIVEN_PS4_BDADDR) != 0 && (DS4EMU_State & EMUSTATE_HAS_BT_BDADDR) != 0 && (DS4EMU_State & EMUSTATE_GIVEN_DS4_1401) != 0 && (DS4EMU_State & EMUSTATE_GIVEN_DS4_1402) == 0 && (DS4EMU_State & EMUSTATE_IS_DS4_BT_CONNECTED) == 0)
+	{
+		len = 16;
+		USBH_DS_Buffer[0] = 0x14;
+		USBH_DS_Buffer[1] = 0x02;
+		if(status = USBH_Set_Report_Blocking(pcore, pdev, 0, 0x03, USBH_DS_Buffer[0], len + 1, USBH_DS_Buffer) == USBH_OK)
+		{
+			DS4EMU_State |= EMUSTATE_GIVEN_DS4_1402;
+		}
+		return;
+	}
+	if ((DS4EMU_State & EMUSTATE_GIVEN_PS4_BDADDR) != 0 && (DS4EMU_State & EMUSTATE_HAS_BT_BDADDR) != 0 && (DS4EMU_State & EMUSTATE_GIVEN_DS4_1401) != 0 && (DS4EMU_State & EMUSTATE_IS_DS4_BT_CONNECTED) != 0)
+	{
+		USBH_Dev_FreeControl(pcore, pdev);
+		dbg_printf(DBGMODE_DEBUG, "DS4 %s all tasks completed, deallocated CTRL-EP\r\n", USBH_Dev_DebugPrint(pdev, 0));
+	}
+}
+
+void USBH_DS4_DeInit_Handler(USB_OTG_CORE_HANDLE* pcore, USBH_DEV* pdev)
+{
+	DS4EMU_State &= ~EMUSTATE_IS_DS4_USB_CONNECTED;
+}
 
 void USBH_DS4_Data_Handler(void* p_io, uint8_t* data, uint16_t len)
 {
-	// assume ep and intf are the only ones available
-	if (len > 64) len = 64;
-	memcpy(USBH_DS_Buffer, data, len);
-	USBH_DS3_NewData = 1;
-	if (data[0] == 0x01) {
-		kbm2c_handleDs4Report(data);
+	USBH_DevIO_t* p_in = p_io;
+
+	if ((DS4EMU_State & EMUSTATE_IS_DS4_BT_CONNECTED) != 0)
+	{
+		p_in->enabled = 0;
+	}
+	else
+	{
+		p_in->enabled = 1;
 	}
 
-	if (USBH_DS_PostedTask == USBH_DSPT_TASK_FEATURE_14_1401) {
-		//dbg_trace();
-		USBH_DS4_Feature14_1401();
-	}
-	else if (USBH_DS_PostedTask == USBH_DSPT_TASK_FEATURE_14_1402) {
-		//dbg_trace();
-		USBH_DS4_Feature14_1402();
+	if (data[0] == 0x01) {
+		kbm2c_handleDs4Report(&data[1]);
 	}
 }
 
 void USBH_DS3_Data_Handler(void* p_io, uint8_t* data, uint16_t len)
 {
-	// assume ep and intf are the only ones available
-	if (len > 64) len = 64;
-	memcpy(USBH_DS_Buffer, data, len);
-	USBH_DS3_NewData = 1;
 	if (data[0] == 0x01) {
 		kbm2c_handleDs3Report(data);
 	}
-}
-
-void USBH_DS4_GetExtraReports(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
-{
-	USBH_Status status;
-	int len;
-
-	flashfile_cacheFlush();
-	nvm_file_t* f = (nvm_file_t*)flashfilesystem.cache;
-
-	len = 36;
-	status = USBH_Get_Report(pcore, pdev, 0, 0x03, 0x02, len + 1, USBH_DS_Buffer);
-	if (status == USBH_OK)
-	{
-		if (memcmp(f->d.fmt.report_02, &USBH_DS_Buffer[1], len) != 0) {
-			// copy only if different
-			memcpy(f->d.fmt.report_02, &USBH_DS_Buffer[1], len);
-			flashfilesystem.cache_dirty = 1;
-		}
-	}
-	else
-	{
-		dbg_printf(DBGMODE_ERR, "DS4 GetReport for 0x02 failed with 0x%08X\r\n", status);
-	}
-
-	len = 3 * 5;
-	status = USBH_Get_Report(pcore, pdev, 0, 0x03, 0x12, len + 1, USBH_DS_Buffer);
-	if (status == USBH_OK)
-	{
-		if (memcmp(f->d.fmt.report_12, &USBH_DS_Buffer[1], len - 6) != 0) {
-			// the subtract 6 is the BD_ADDR that we don't care about
-			memcpy(f->d.fmt.report_12, &USBH_DS_Buffer[1], len);
-			flashfilesystem.cache_dirty = 1;
-		}
-	}
-	else
-	{
-		dbg_printf(DBGMODE_ERR, "DS4 GetReport for 0x02 failed with 0x%08X\r\n", status);
-	}
-
-	len = 8 * 6;
-	status = USBH_Get_Report(pcore, pdev, 0, 0x03, 0xA3, len + 1, USBH_DS_Buffer);
-	if (status == USBH_OK)
-	{
-		if (memcmp(f->d.fmt.report_a3, &USBH_DS_Buffer[1], len) != 0) {
-			memcpy(f->d.fmt.report_a3, &USBH_DS_Buffer[1], len);
-			flashfilesystem.cache_dirty = 1;
-		}
-	}
-	else
-	{
-		dbg_printf(DBGMODE_ERR, "DS4 GetReport for 0x02 failed with 0x%08X\r\n", status);
-	}
-
-	flashfile_cacheFlush();
-}
-
-void USBH_DS4_SetExtraReports(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
-{
-	USBH_Status status;
-	int len;
-	len = 6 + 8 + 8;
-	USBH_DS_Buffer[0] = 0x13;
-	memcpy(&USBH_DS_Buffer[1], flashfilesystem.nvm_file->d.fmt.report_13, len);
-	status = USBH_Set_Report(pcore, pdev, 0, 0x03, 0x13, len + 1, USBH_DS_Buffer);
-}
-
-void USBH_DS4_Feature14_1401(void)
-{
-	USBH_DS_PostedTask = 0;
-
-	memset(USBH_DSPT_core->host.Rx_Buffer, 0, 17);
-	USBH_DSPT_core->host.Rx_Buffer[0] = 0x14;
-	USBH_DSPT_core->host.Rx_Buffer[1] = 0x01;
-
-	USBH_DSPT_dev->Control.setup.b.bmRequestType = USB_H2D | USB_REQ_RECIPIENT_INTERFACE | USB_REQ_TYPE_CLASS;
-	USBH_DSPT_dev->Control.setup.b.bRequest = 0x01;
-	USBH_DSPT_dev->Control.setup.b.wValue.w = 0x0314;
-	USBH_DSPT_dev->Control.setup.b.wIndex.w = 0;
-	USBH_DSPT_dev->Control.setup.b.wLength.w = 17;
-
-	USBH_Status status = USBH_CtlReq_Blocking(USBH_DSPT_core, USBH_DSPT_dev, USBH_DSPT_core->host.Rx_Buffer , USBH_DSPT_dev->Control.setup.b.wLength.w );
-}
-
-void USBH_DS4_Feature14_1402(void)
-{
-	USBH_DS_PostedTask = 0;
-
-	memset(USBH_DSPT_core->host.Rx_Buffer, 0, 17);
-	USBH_DSPT_core->host.Rx_Buffer[0] = 0x14;
-	USBH_DSPT_core->host.Rx_Buffer[1] = 0x02;
-
-	USBH_DSPT_dev->Control.setup.b.bmRequestType = USB_H2D | USB_REQ_RECIPIENT_INTERFACE | USB_REQ_TYPE_CLASS;
-	USBH_DSPT_dev->Control.setup.b.bRequest = 0x01;
-	USBH_DSPT_dev->Control.setup.b.wValue.w = 0x0314;
-	USBH_DSPT_dev->Control.setup.b.wIndex.w = 0;
-	USBH_DSPT_dev->Control.setup.b.wLength.w = 17;
-
-	USBH_Status status = USBH_CtlReq_Blocking(USBH_DSPT_core, USBH_DSPT_dev, USBH_DSPT_core->host.Rx_Buffer , USBH_DSPT_dev->Control.setup.b.wLength.w );
 }

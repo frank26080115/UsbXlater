@@ -220,6 +220,17 @@ int8_t USBH_Free_Channel  (USB_OTG_CORE_HANDLE *pcore, int8_t* idx)
   return USBH_OK;
 }
 
+int8_t USBH_Free_Channel_Without_Halt  (USB_OTG_CORE_HANDLE *pcore, int8_t* idx)
+{
+
+  if((*idx) >= 0)
+  {
+    pcore->host.channel[(*idx)] &= HC_USED_MASK;
+  }
+  (*idx) = -1;
+  return USBH_OK;
+}
+
 
 /**
   * @brief  USBH_DeAllocate_AllChannel

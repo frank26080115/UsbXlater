@@ -154,7 +154,7 @@
 /* As per USB specs 9.2.6.4 :Standard request with data request timeout: 5sec
    Standard request with no data stage timeout : 50ms */
 #define DATA_STAGE_TIMEOUT                              5000 
-#define NODATA_STAGE_TIMEOUT                            50
+#define NODATA_STAGE_TIMEOUT                            500 // hacked
 
 /**
   * @}

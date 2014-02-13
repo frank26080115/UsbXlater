@@ -39,6 +39,6 @@ typedef struct
 }
 UsbHci_Data_t;
 
-#define USBHCI_ENABLE_DYNAMIC_HC_ALLOC
+//#define USBHCI_ENABLE_DYNAMIC_HC_ALLOC
 
 #endif

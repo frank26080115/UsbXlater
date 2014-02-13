@@ -69,6 +69,8 @@
 #include "bt_control_iphone.h"
 #endif
 
+extern char btproxy_check_bdaddr(bd_addr_t); // Frank: hack to filter out everything we don't want connected
+
 static void hci_update_scan_enable(void);
 static gap_security_level_t gap_security_level_for_connection(hci_connection_t * connection);
 
@@ -540,7 +542,8 @@ static void event_handler(uint8_t *packet, int size){
                         hci_stack->acl_data_packet_length = HCI_ACL_PAYLOAD_SIZE;
                     }
                     log_info("hci_read_buffer_size: used size %u, count %u\n",
-                             hci_stack->acl_data_packet_length, hci_stack->total_num_acl_packets); 
+                             hci_stack->acl_data_packet_length, hci_stack->total_num_acl_packets);
+                    hci_stack->total_num_acl_packets = 1; // hack, one packet out at a time please
                 }
             }
 #ifdef HAVE_BLE
@@ -603,18 +606,26 @@ static void event_handler(uint8_t *packet, int size){
             link_type = packet[11];
             log_info("Connection_incoming: %s, type %u\n", bd_addr_to_str(addr), link_type);
             if (link_type == 1) { // ACL
-                conn = connection_for_address(addr);
-                if (!conn) {
-                    conn = create_connection_for_addr(addr);
+                if (btproxy_check_bdaddr(addr)) // hack, filter out non acceptable addresses
+                {
+                    conn = connection_for_address(addr);
+                    if (!conn) {
+                        conn = create_connection_for_addr(addr);
+                    }
+                    if (!conn) {
+                        // CONNECTION REJECTED DUE TO LIMITED RESOURCES (0X0D)
+                        hci_stack->decline_reason = 0x0d;
+                        BD_ADDR_COPY(hci_stack->decline_addr, addr);
+                        break;
+                    }
+                    conn->state = RECEIVED_CONNECTION_REQUEST;
+                    hci_run();
                 }
-                if (!conn) {
-                    // CONNECTION REJECTED DUE TO LIMITED RESOURCES (0X0D)
-                    hci_stack->decline_reason = 0x0d;
+                else
+                {
+                    hci_stack->decline_reason = 0x0F; // reject due to unacceptable BD_ADDR
                     BD_ADDR_COPY(hci_stack->decline_addr, addr);
-                    break;
                 }
-                conn->state = RECEIVED_CONNECTION_REQUEST;
-                hci_run();
             } else {
                 // SYNCHRONOUS CONNECTION LIMIT TO A DEVICE EXCEEDED (0X0A)
                 hci_stack->decline_reason = 0x0a;

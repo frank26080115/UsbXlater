@@ -26,21 +26,37 @@ void USBH_Dev_HID_UnrecoveredError(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev);
 void HID_Init_Default_Handler(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev, uint8_t intf);
 void HID_Decode_Default_Handler(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev, uint8_t intf, uint8_t ep, uint8_t* data, uint8_t len);
 
+USBH_Status USBH_Get_Report_Blocking (USB_OTG_CORE_HANDLE *pcore,
+                                      USBH_DEV *pdev,
+                                      uint8_t intf,
+                                      uint8_t reportType,
+                                      uint8_t reportId,
+                                      uint8_t reportLen,
+                                      uint8_t* reportBuff);
+
+USBH_Status USBH_Set_Report_Blocking (USB_OTG_CORE_HANDLE *pcore,
+                                      USBH_DEV *pdev,
+                                      uint8_t intf,
+                                      uint8_t reportType,
+                                      uint8_t reportId,
+                                      uint8_t reportLen,
+                                      uint8_t* reportBuff);
+
 USBH_Status USBH_Get_Report (USB_OTG_CORE_HANDLE *pcore,
-                                 USBH_DEV *pdev,
-                                    uint8_t intf,
-                                    uint8_t reportType,
-                                    uint8_t reportId,
-                                    uint8_t reportLen,
-                                    uint8_t* reportBuff);
+                             USBH_DEV *pdev,
+                             uint8_t intf,
+                             uint8_t reportType,
+                             uint8_t reportId,
+                             uint8_t reportLen,
+                             uint8_t* reportBuff);
 
 USBH_Status USBH_Set_Report (USB_OTG_CORE_HANDLE *pcore,
-                                 USBH_DEV *pdev,
-                                    uint8_t intf,
-                                    uint8_t reportType,
-                                    uint8_t reportId,
-                                    uint8_t reportLen,
-                                    uint8_t* reportBuff);
+                             USBH_DEV *pdev,
+                             uint8_t intf,
+                             uint8_t reportType,
+                             uint8_t reportId,
+                             uint8_t reportLen,
+                             uint8_t* reportBuff);
 
 extern USBH_Device_cb_TypeDef USBH_Dev_CB_HID;
 
@@ -73,6 +89,9 @@ typedef struct
 {
 	USBH_DevIO_t** io;
 	uint8_t ioIdx;
+	void (*init_handler)(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev);
+	void (*custom_task)(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev);
+	void (*deinit_handler)(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev);
 }
 HID_Data_t;
 
@@ -91,6 +110,6 @@ HID_Data_t;
 #define USB_HID_SET_IDLE             0x0A
 #define USB_HID_SET_PROTOCOL         0x0B
 
-extern char USBH_Dev_Has_HID;
+extern char USBH_Dev_HID_Cnt;
 
 #endif

@@ -375,7 +375,7 @@ USBH_Status USBH_SetInterface(USB_OTG_CORE_HANDLE *pcore,
 USBH_Status USBH_ClrFeature(USB_OTG_CORE_HANDLE *pcore,
                             USBH_DEV *pdev,
                             uint8_t ep_num,
-                            uint8_t hc_num)
+                             int8_t hc_num)
 {
 
   pdev->Control.setup.b.bmRequestType = USB_H2D |
@@ -402,7 +402,7 @@ USBH_Status USBH_ClrFeature(USB_OTG_CORE_HANDLE *pcore,
 USBH_Status USBH_ClrFeature_Blocking(USB_OTG_CORE_HANDLE *pcore,
                             USBH_DEV *pdev,
                             uint8_t ep_num,
-                            uint8_t hc_num)
+                             int8_t hc_num)
 {
 
   pdev->Control.setup.b.bmRequestType = USB_H2D |
@@ -414,14 +414,16 @@ USBH_Status USBH_ClrFeature_Blocking(USB_OTG_CORE_HANDLE *pcore,
   pdev->Control.setup.b.wIndex.w = ep_num;
   pdev->Control.setup.b.wLength.w = 0;
 
+  /*
   if ((ep_num & USB_REQ_DIR_MASK ) == USB_D2H)
-  { /* EP Type is IN */
+  {
     pcore->host.hc[hc_num].toggle_in = 0;
   }
   else
-  {/* EP Type is OUT */
+  {
     pcore->host.hc[hc_num].toggle_out = 0;
   }
+  */
 
   return USBH_CtlReq_Blocking(pcore, pdev, 0 , 0 );
 }

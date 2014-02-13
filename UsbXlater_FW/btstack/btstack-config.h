@@ -5,7 +5,7 @@
 #define HAVE_TICK
 #define HAVE_MALLOC
 
-// #define ENABLE_LOG_INFO 
+//#define ENABLE_LOG_INFO
 #define ENABLE_LOG_ERROR
 
 #define HCI_ACL_PAYLOAD_SIZE 1024

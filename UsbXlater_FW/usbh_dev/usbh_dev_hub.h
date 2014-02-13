@@ -33,6 +33,8 @@ USBH_Status USBH_Dev_Hub_SetPortFeature(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pd
 USBH_Status USBH_Dev_Hub_GetPortStatus(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev, uint8_t port, uint16_t* wPortStatus, uint16_t* wPortChange);
 USBH_Status USBH_Dev_Hub_ClearPortFeature(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev, uint8_t port, uint16_t feature, uint8_t selector);
 
+void USBH_Dev_Hub_DataHandler(void* p_io, uint8_t* data, uint16_t len);
+
 void USBH_Hub_Allow_Next(USBH_DEV *pdev);
 
 typedef struct

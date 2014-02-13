@@ -47,6 +47,7 @@ void USBH_Dev_BtHci_D2HIntf_AclDataHandler(void* p_io, uint8_t* data, uint16_t l
 {
 	USBH_DevIO_t* p_in = (USBH_DevIO_t*)p_io;
 	UsbHci_Data_t* UsbHci_Data = (UsbHci_Data_t*)p_in->pdev->Usr_Data;
+	//dbg_printf(DBGMODE_TRACE, "USB HCI ACL Handler 0x%02X%02X (len %d)\r\n", data[1], data[0], len);
 	UsbHci_Data->packet_handler(HCI_ACL_DATA_PACKET, data, len);
 }
 
@@ -54,40 +55,38 @@ void USBH_Dev_BtHci_D2HIntf_EventHandler(void* p_io, uint8_t* data, uint16_t len
 {
 	USBH_DevIO_t* p_in = (USBH_DevIO_t*)p_io;
 	UsbHci_Data_t* UsbHci_Data = (UsbHci_Data_t*)p_in->pdev->Usr_Data;
+	dbg_printf(DBGMODE_TRACE, "USB HCI Event 0x%02X 0x%02X (len %d)\r\n", data[0], data[1], len);
 	UsbHci_Data->packet_handler(HCI_EVENT_PACKET, data, len);
 }
 
 USBH_Status USBH_Dev_BtHci_Task(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 {
 	UsbHci_Data_t* UsbHci_Data = (UsbHci_Data_t*)pdev->Usr_Data;
-	if (UsbHci_Data->ioIdx == 0)
+	if (UsbHci_Data->ioIdx <= 0)
 	{
+		BT_USBH_CORE = pcore;
+		BT_USBH_DEV = pdev;
 		btproxy_init_USB();
 		UsbHci_Data->ioIdx++;
 	}
+
+	btproxy_task();
+
+	if (UsbHci_Data->dataOutIO->state != UIOSTATE_NEXT)
+	{
+		USBH_DevIO_Task(UsbHci_Data->dataOutIO);
+	}
 	else if (UsbHci_Data->ioIdx == 1)
-	{
-		btproxy_task();
-		UsbHci_Data->ioIdx++;
-	}
-	else if (UsbHci_Data->ioIdx == 2)
-	{
-		USBH_DevIO_Task(UsbHci_Data->dataInIO);
-		if (UsbHci_Data->dataInIO->state == UIOSTATE_NEXT) {
-			UsbHci_Data->ioIdx++;
-		}
-	}
-	else if (UsbHci_Data->ioIdx == 3)
 	{
 		USBH_DevIO_Task(UsbHci_Data->eventIO);
 		if (UsbHci_Data->eventIO->state == UIOSTATE_NEXT) {
 			UsbHci_Data->ioIdx++;
 		}
 	}
-	else if (UsbHci_Data->ioIdx == 4)
+	else if (UsbHci_Data->ioIdx == 2)
 	{
-		USBH_DevIO_Task(UsbHci_Data->dataOutIO);
-		if (UsbHci_Data->dataOutIO->state == UIOSTATE_NEXT) {
+		USBH_DevIO_Task(UsbHci_Data->dataInIO);
+		if (UsbHci_Data->dataInIO->state == UIOSTATE_NEXT) {
 			UsbHci_Data->ioIdx++;
 		}
 	}
@@ -176,14 +175,9 @@ void USBH_Dev_BtHci_EnumerationDone(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 	dynamicHc = 1;
 	#endif
 
-
-	//dbg_printf(DBGMODE_DEBUG, "%s bNumInterfaces:%d\r\n", USBH_Dev_DebugPrint(pdev, 0), pdev->device_prop.Cfg_Desc.bNumInterfaces);
-
 	for (int intf = 0; intf < pdev->device_prop.Cfg_Desc.bNumInterfaces; intf++)
 	{
 		USBH_InterfaceDesc_TypeDef* pintf = &pdev->device_prop.Itf_Desc[intf];
-
-		//dbg_printf(DBGMODE_DEBUG, "%s intf[%d]bNumEndpoints:%d\r\n", USBH_Dev_DebugPrint(pdev, 0), intf, pintf->bNumEndpoints);
 
 		for (int ep = 0; ep < pintf->bNumEndpoints; ep++)
 		{
@@ -191,25 +185,16 @@ void USBH_Dev_BtHci_EnumerationDone(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 
 			if (UsbHci_Data->eventIO == 0 && pep->bEndpointAddress == (0x01 | USB_D2H) && (pep->bmAttributes & EP_TYPE_MSK) == EP_TYPE_INTR)
 			{
-				if (pep->wMaxPacketSize > 16) {
-					pep->wMaxPacketSize = 16;
-				}
 				UsbHci_Data->eventIO = USBH_DevIO_Manager_New(pcore, pdev, pep, dynamicHc, USBH_Dev_BtHci_D2HIntf_EventHandler, 0);
 				dbg_printf(DBGMODE_DEBUG, "USBHCI %s found event EP\r\n", USBH_Dev_DebugPrint(pdev, pep));
 			}
 			else if (UsbHci_Data->dataInIO == 0 && (pep->bEndpointAddress & USB_EP_DIR_MSK) == USB_D2H && (pep->bmAttributes & EP_TYPE_MSK) == EP_TYPE_BULK)
 			{
-				if (pep->wMaxPacketSize > 64) {
-					pep->wMaxPacketSize = 64;
-				}
 				UsbHci_Data->dataInIO = USBH_DevIO_Manager_New(pcore, pdev, pep, dynamicHc, USBH_Dev_BtHci_D2HIntf_AclDataHandler, 0);
 				dbg_printf(DBGMODE_DEBUG, "USBHCI %s found data in EP\r\n", USBH_Dev_DebugPrint(pdev, pep));
 			}
 			else if (UsbHci_Data->dataOutIO == 0 && (pep->bEndpointAddress & USB_EP_DIR_MSK) == USB_H2D && (pep->bmAttributes & EP_TYPE_MSK) == EP_TYPE_BULK)
 			{
-				if (pep->wMaxPacketSize > 64) {
-					pep->wMaxPacketSize = 64;
-				}
 				UsbHci_Data->dataOutIO = USBH_DevIO_Manager_New(pcore, pdev, pep, dynamicHc, 0, 0);
 				dbg_printf(DBGMODE_DEBUG, "USBHCI %s found data out EP\r\n", USBH_Dev_DebugPrint(pdev, pep));
 			}
@@ -255,8 +240,6 @@ void USBH_Dev_BtHci_EnumerationDone(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 		UsbHci_Data->dataOutIO = USBH_DevIO_Manager_New(pcore, pdev, pep, dynamicHc, 0, 0);
 	}
 
-	BT_USBH_CORE = pcore;
-	BT_USBH_DEV = pdev;
 	UsbHci_Data->packet_handler = stm32usbh_handle_raw;
 
 	dbg_printf(DBGMODE_TRACE, "USB BT HCI finished all enumeration steps\r\n");
@@ -276,7 +259,7 @@ USBH_Status USBH_Dev_BtHci_Command(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev, 
 {
 	USBH_Status status;
 
-	dbg_printf(DBGMODE_TRACE, "USBH_Dev_BtHci_Command \r\n");
+	//dbg_printf(DBGMODE_TRACE, "USB_Hci_Cmd 0x%02X%02X\r\n", data[1], data[0]);
 
 	pdev->Control.setup.b.bmRequestType = USB_H2D | USB_REQ_RECIPIENT_DEVICE | USB_REQ_TYPE_CLASS;
 	pdev->Control.setup.b.bRequest = 0;
@@ -294,6 +277,8 @@ USBH_Status USBH_Dev_BtHci_TxData(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev, u
 		return USBH_BUSY;
 	}
 
+	//dbg_printf(DBGMODE_TRACE, "USB_Hci_Tx_ACL %02X%02X%02X%02X%02X%02X%02X%02X\r\n", data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7]);
+
 	UsbHci_Data_t* UsbHci_Data = pdev->Usr_Data;
 	USBH_DevIO_t* io = UsbHci_Data->dataOutIO;
 
@@ -309,7 +294,8 @@ char USBH_Dev_BtHci_CanSendPacket(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 	USBH_DevIO_t* io = UsbHci_Data->dataOutIO;
 	if (io->remaining > 0)
 		return 0;
-	if (io->state == UIOSTATE_SEND_DATA || io->state == UIOSTATE_WAIT_DATA || io->state == UIOSTATE_FINALIZE)
+	if (io->state != UIOSTATE_NEXT)
 		return 0;
+
 	return 1;
 }

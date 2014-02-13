@@ -92,8 +92,8 @@ void btproxy_init(hci_uart_config_t* ucfg, bt_control_t* btctrlcfg, hci_transpor
 	btstack_memory_init();
 	run_loop_init(RUN_LOOP_BTPROXY);
 	hci_init(xport, ucfg, btctrlcfg, &btproxy_db_memory);
-	hci_set_class_of_device(0x00002508); // pretend to be a DS4, which is HID
-	hci_set_local_name("Wireless Controller");
+	hci_set_class_of_device(btproxy_provide_class_of_device());
+	hci_set_local_name(btproxy_provide_name_of_device());
 	hci_ssp_set_enable(1);
 	hci_ssp_set_io_capability(SSP_IO_CAPABILITY_NO_INPUT_NO_OUTPUT);
 	hci_ssp_set_authentication_requirement(SSP_IO_AUTHREQ_MITM_PROTECTION_NOT_REQUIRED_GENERAL_BONDING);
@@ -108,15 +108,6 @@ void btproxy_init(hci_uart_config_t* ucfg, bt_control_t* btctrlcfg, hci_transpor
 void btproxy_task()
 {
 	btproxy_runloop_execute_once();
-}
-
-void btproxy_svc_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t* packet, uint16_t size)
-{
-	char handled = 0;
-	dbg_printf(DBGMODE_TRACE, "btproxy_svc_packet_handler, 0x%02X, 0x%04X, %d\r\n", packet_type, channel, size);
-	if (handled == 0) {
-		btproxy_packet_handler(NULL, packet_type, channel, packet, size);
-	}
 }
 
 void btproxy_l2cap_packet_handler(void * connection, uint8_t packet_type, uint16_t channel, uint8_t* packet, uint16_t size)
@@ -143,6 +134,8 @@ void btproxy_packet_handler(void * connection, uint8_t packet_type, uint16_t cha
 	uint8_t num_of_cmds;
 	uint16_t cmd_opcode;
 	uint8_t cmd_status;
+	uint16_t conn_handle;
+	bd_addr_t addr;
 
 	//dbg_printf(DBGMODE_TRACE, "btproxy_packet_handler, 0x%02X, 0x%04X, %d\r\n", packet_type, channel, size);
 
@@ -156,15 +149,16 @@ void btproxy_packet_handler(void * connection, uint8_t packet_type, uint16_t cha
 					if (packet[2] == HCI_STATE_WORKING) {
 						sdp_init();
 						sdp_register_packet_handler(btproxy_sdp_packet_handler);
-						l2cap_register_service_internal(connection, btproxy_svc_packet_handler, PSM_HID_INTERRUPT, 250, LEVEL_0);
-						l2cap_register_service_internal(connection, btproxy_svc_packet_handler, PSM_HID_CONTROL, 250, LEVEL_0);
-						dbg_printf(DBGMODE_TRACE, "HCI_STATE_WORKING, services registered\r\n");
+						dbg_printf(DBGMODE_TRACE, "HCI_STATE_WORKING, SDP service registered\r\n");
 						handled = 1;
 					}
 					else if (packet[2] == HCI_STATE_INITIALIZING) {
 						dbg_printf(DBGMODE_TRACE, "BTSTACK_EVENT_STATE HCI_STATE_INITIALIZING\r\n");
 						handled = 1;
 					}
+					break;
+				case BTSTACK_EVENT_NR_CONNECTIONS_CHANGED:
+
 					break;
 				case HCI_EVENT_COMMAND_COMPLETE:
 					num_of_cmds = packet[2];
@@ -189,6 +183,10 @@ void btproxy_packet_handler(void * connection, uint8_t packet_type, uint16_t cha
 						break;
 					}
 					if (COMMAND_COMPLETE_EVENT(packet, hci_reset)){
+						handled = 1;
+						break;
+					}
+					if (COMMAND_COMPLETE_EVENT(packet, hci_write_scan_enable)){
 						handled = 1;
 						break;
 					}
@@ -227,7 +225,46 @@ void btproxy_packet_handler(void * connection, uint8_t packet_type, uint16_t cha
 						btproxy_init_statemachine++;
 						handled = 1;
 					}
+					if (COMMAND_STATUS_EVENT(packet, hci_read_local_version_information)
+						|| COMMAND_STATUS_EVENT(packet, hci_read_remote_supported_features_command)
+						//|| COMMAND_STATUS_EVENT(packet, hci_read_remote_supported_features_command)
+						) {
+						handled = 1;
+					}
+					if (cmd_opcode == 0x0000) { // well, it happens, I don't know why
+						handled = 1;
+					}
 					break;
+				case HCI_EVENT_CONNECTION_REQUEST:
+					handled = 1;
+					dbg_printf(DBGMODE_DEBUG, "BT conn request from %s\r\n", print_bdaddr(&packet[2]));
+					BD_ADDR_COPY(addr, &packet[2]);
+					if (btproxy_check_bdaddr(addr) == 0) {
+						dbg_printf(DBGMODE_DEBUG, "BT conn request will be rejected\r\n");
+					}
+					break;
+				case HCI_EVENT_CONNECTION_COMPLETE:
+					dbg_printf(DBGMODE_DEBUG, "BT conn complete from %s\r\n", print_bdaddr(&packet[5]));
+					conn_handle = READ_BT_16(packet, 2);
+					// let the next handler handle this one
+					break;
+				case HCI_EVENT_DISCONNECTION_COMPLETE:
+					// let the next handler handle this one
+					break;
+				case HCI_EVENT_READ_REMOTE_SUPPORTED_FEATURES_COMPLETE:
+					handled = 1;
+					conn_handle = READ_BT_16(packet, 3);
+					dbg_printf(DBGMODE_TRACE, "HCI_EVENT_READ_REMOTE_SUPPORTED_FEATURES_COMPLETE, Remote Supported Features[S:0x%02X CH:0x%04X]: %02X %02X %02X %02X %02X %02X %02X %02X\r\n",
+								packet[2], conn_handle,
+								packet[5], packet[6], packet[7], packet[8],
+								packet[9], packet[10], packet[11], packet[12]
+						);
+					break;
+				case HCI_EVENT_NUMBER_OF_COMPLETED_PACKETS:
+				case GAP_SECURITY_LEVEL:
+				case HCI_EVENT_LINK_SUPERVISION_TIMEOUT_CHANGED:
+				case HCI_EVENT_MAX_SLOTS_CHANGED:
+				case HCI_EVENT_PAGE_SCAN_REPETITION_MODE_CHANGE:
 				case BTSTACK_EVENT_DISCOVERABLE_ENABLED:
 				case L2CAP_EVENT_SERVICE_REGISTERED:
 					handled = 1;
@@ -238,9 +275,16 @@ void btproxy_packet_handler(void * connection, uint8_t packet_type, uint16_t cha
 			break;
 	}
 
+	handled |= btproxy_sub_handler(connection, packet_type, channel, packet, size);
+
 	if (handled == 0)
 	{
-		dbg_printf(DBGMODE_TRACE, "btproxy_packet_handler, unhandled, 0x%02X, 0x%04X, %d\r\n", packet_type, channel, size);
+		// TODO decode HQ/BCCMD channel response just in case baud rate was changed
+	}
+
+	if (handled == 0)
+	{
+		dbg_printf(DBGMODE_TRACE, "btproxy_packet_handler, unhandled, 0x%02X, 0x%04X, (%d):  ", packet_type, channel, size);
 		for (int i = 0; i < size; i++) {
 			dbg_printf(DBGMODE_TRACE, "0x%02X ", packet[i]);
 		}
@@ -334,15 +378,14 @@ CMD_ACTION_t btproxy_init_cmd(void * obj, uint8_t * hci_cmd_buffer)
 			hci_send_cmd(&hci_write_page_scan_type, 0x01); // interlaced scan
 			break;
 		case 17:
-			//hci_send_cmd(&hci_write_default_erroneous_data_reporting, 0x00); // disabled
-			//break;
+			hci_send_cmd(&hci_write_default_erroneous_data_reporting, 0x00); // disabled
+			break;
 			btproxy_init_statemachine += 2; // skip to next state
 			return NO_PACKET_GET_NEXT_CMD;
 		case 18:
-			hcistack->connectable = 1;
-			hcistack->discoverable = 1;
-			hci_send_cmd(&hci_write_scan_enable, (hcistack->connectable << 1) | hcistack->discoverable);
-			break;
+			hci_discoverable_control(0);
+			btproxy_init_statemachine += 2; // skip to next state
+			return NO_PACKET_GET_NEXT_CMD;
 		default:
 			btproxy_init_statemachine = -1; // finished
 			dbg_printf(DBGMODE_TRACE, "btproxy_init_cmd last command\r\n");
@@ -352,6 +395,7 @@ CMD_ACTION_t btproxy_init_cmd(void * obj, uint8_t * hci_cmd_buffer)
 	return SENT_PACKET_GET_NEXT_CMD;
 }
 
+// TODO untested
 int btproxy_baudrate_cmd(void * config, uint32_t baudrate, uint8_t *hci_cmd_buffer)
 {
 	dbg_printf(DBGMODE_TRACE, "btproxy_baudrate_cmd %d\r\n", baudrate);

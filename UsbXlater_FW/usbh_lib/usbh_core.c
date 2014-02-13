@@ -37,7 +37,6 @@
 #include <usbh_dev/usbh_dev_manager.h>
 #include <vcp.h>
 
-
 /** @addtogroup USBH_LIB
   * @{
   */
@@ -202,6 +201,13 @@ USBH_Status USBH_DeInit(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
 	pdev->EnumState = ENUM_IDLE;
 	pdev->RequestState = CMD_SEND;
 
+	pdev->Control.hc_num_in = -1;
+	pdev->Control.hc_num_out = -1;
+	pdev->Control.hc_in_tgl_in = -1;
+	pdev->Control.hc_in_tgl_out = -1;
+	pdev->Control.hc_out_tgl_in = -1;
+	pdev->Control.hc_out_tgl_out = -1;
+
 	pdev->Control.state = CTRL_SETUP;
 	pdev->Control.ep0size = USB_OTG_MAX_EP0_SIZE;
 
@@ -241,7 +247,7 @@ void USBH_Process(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 			if (rootDisconnectedCnt > 5) {
 				HCD_ResetPort(pcore);
 				pdev->gState = HOST_DEV_DISCONNECTED;
-				dbg_printf(DBGMODE_TRACE, "HOST_DEV_DISCONNECTED %s\r\n", USBH_Dev_DebugPrint(pdev, 0));
+				//dbg_printf(DBGMODE_TRACE, "HOST_DEV_DISCONNECTED %s\r\n", USBH_Dev_DebugPrint(pdev, 0));
 			}
 			else {
 				delay_ms(1);
@@ -258,39 +264,35 @@ void USBH_Process(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 	{
 
 	case HOST_IDLE :
-	if (isDevRoot)
-	{
-		if (HCD_IsDeviceConnected(pcore))
+		if (isDevRoot)
 		{
-			if (USBH_Dev_Reset_Timer == 0) {
-				USBH_Dev_Reset_Timer = HCD_GetCurrentFrame(pcore);
+			if (HCD_IsDeviceConnected(pcore))
+			{
+				if (USBH_Dev_Reset_Timer == 0) {
+					USBH_Dev_Reset_Timer = systick_1ms_cnt;
+				}
+				else if ((systick_1ms_cnt - USBH_Dev_Reset_Timer) > 150) {
+					pdev->gState = HOST_DEV_ATTACHED;
+					//dbg_printf(DBGMODE_TRACE, "HOST_DEV_ATTACHED %s\r\n", USBH_Dev_DebugPrint(pdev, 0));
+				}
 			}
-			else if ((HCD_GetCurrentFrame(pcore) - USBH_Dev_Reset_Timer) > 150) {
-				pdev->gState = HOST_DEV_ATTACHED;
-				dbg_printf(DBGMODE_TRACE, "HOST_DEV_ATTACHED %s\r\n", USBH_Dev_DebugPrint(pdev, 0));
+			else
+			{
+				USBH_Dev_Reset_Timer = 0;
 			}
 		}
-		else
-		{
-			USBH_Dev_Reset_Timer = 0;
-		}
-	}
 		break;
 	case HOST_DEV_RESET_PENDING :
 		// does not apply to root hubs
 		// once the reset is done, the hub should receive an interrupt-in packet indicating, which is where the new state HOST_DEV_DELAY is set
 		break;
 	case HOST_DEV_DELAY :
-		if ((HCD_GetCurrentFrame(pcore) - USBH_Dev_Reset_Timer) > 150) {
+		if ((systick_1ms_cnt - USBH_Dev_Reset_Timer) > 150) {
 			pdev->gState = HOST_DEV_ATTACHED;
-			dbg_printf(DBGMODE_TRACE, "HOST_DEV_ATTACHED %s\r\n", USBH_Dev_DebugPrint(pdev, 0));
+			//dbg_printf(DBGMODE_TRACE, "HOST_DEV_ATTACHED %s\r\n", USBH_Dev_DebugPrint(pdev, 0));
 		}
 		break;
 	case HOST_DEV_ATTACHED :
-
-		if (USBH_Dev_AllocControl(pcore, pdev) > 3) {
-			break;
-		}
 
 		((USBH_Device_cb_TypeDef*)pdev->cb)->DeviceAttached(pcore, pdev);
 
@@ -306,22 +308,28 @@ void USBH_Process(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 			pdev->device_prop.speed = HCD_GetCurrentSpeed(pcore);
 			((USBH_Device_cb_TypeDef*)pdev->cb)->DeviceSpeedDetected(pcore, pdev, pdev->device_prop.speed);
 
+			if (USBH_Dev_AllocControl(pcore, pdev) < 0) {
+				break;
+			}
+
 			pdev->gState = HOST_ENUMERATION;
-			dbg_printf(DBGMODE_TRACE, "HOST_ENUMERATION %s\r\n", USBH_Dev_DebugPrint(pdev, 0));
-			USBH_Dev_AllocControl(pcore, pdev);
+			//dbg_printf(DBGMODE_TRACE, "HOST_ENUMERATION %s\r\n", USBH_Dev_DebugPrint(pdev, 0));
 		}
 		else
 		{
 			pdev->gState = HOST_ENUMERATION_DELAY;
-			USBH_Dev_Reset_Timer = HCD_GetCurrentFrame(pcore);
+			USBH_Dev_Reset_Timer = systick_1ms_cnt;
 		}
 		break;
 
 	case HOST_ENUMERATION_DELAY:
-		if ((HCD_GetCurrentFrame(pcore) - USBH_Dev_Reset_Timer) > 150) {
+		if ((systick_1ms_cnt - USBH_Dev_Reset_Timer) > 150)
+		{
+			if (USBH_Dev_AllocControl(pcore, pdev) < 0) {
+				break;
+			}
 			pdev->gState = HOST_ENUMERATION;
-			dbg_printf(DBGMODE_TRACE, "HOST_ENUMERATION %s\r\n", USBH_Dev_DebugPrint(pdev, 0));
-			USBH_Dev_AllocControl(pcore, pdev);
+			//dbg_printf(DBGMODE_TRACE, "HOST_ENUMERATION %s\r\n", USBH_Dev_DebugPrint(pdev, 0));
 		}
 	break;
 
@@ -457,7 +465,7 @@ static USBH_Status USBH_HandleEnum(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
       pdev->Control.ep0size = pdev->device_prop.Dev_Desc.bMaxPacketSize;
 
       pdev->EnumState = ENUM_GET_FULL_DEV_DESC;
-      dbg_printf(DBGMODE_TRACE, "ENUM_GET_FULL_DEV_DESC %s\r\n", USBH_Dev_DebugPrint(pdev, 0));
+      //dbg_printf(DBGMODE_TRACE, "ENUM_GET_FULL_DEV_DESC %s\r\n", USBH_Dev_DebugPrint(pdev, 0));
       if (isDevRoot != 0) {
         HCD_ResetPort(pcore);
         /* modify control channels configuration for MaxPacket size */
@@ -477,14 +485,14 @@ static USBH_Status USBH_HandleEnum(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
       }
       else {
         pdev->EnumState = ENUM_GET_FULL_DEV_DESC_WAIT;
-        dbg_printf(DBGMODE_TRACE, "ENUM_GET_FULL_DEV_DESC_WAIT %s\r\n", USBH_Dev_DebugPrint(pdev, 0));
-        USBH_Dev_Reset_Timer = HCD_GetCurrentFrame(pcore);
+        //dbg_printf(DBGMODE_TRACE, "ENUM_GET_FULL_DEV_DESC_WAIT %s\r\n", USBH_Dev_DebugPrint(pdev, 0));
+        USBH_Dev_Reset_Timer = systick_1ms_cnt;
       }
     }
     break;
 
   case ENUM_GET_FULL_DEV_DESC_WAIT:
-    if ((HCD_GetCurrentFrame(pcore) - USBH_Dev_Reset_Timer) > 150) {
+    if ((systick_1ms_cnt - USBH_Dev_Reset_Timer) > 150) {
       USBH_Modify_Channel (pcore,
                            pdev->Control.hc_num_out,
                            0,
@@ -499,7 +507,7 @@ static USBH_Status USBH_HandleEnum(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
                            0,
                            pdev->Control.ep0size);
       pdev->EnumState = ENUM_GET_FULL_DEV_DESC;
-      dbg_printf(DBGMODE_TRACE, "ENUM_GET_FULL_DEV_DESC %s\r\n", USBH_Dev_DebugPrint(pdev, 0));
+      //dbg_printf(DBGMODE_TRACE, "ENUM_GET_FULL_DEV_DESC %s\r\n", USBH_Dev_DebugPrint(pdev, 0));
     }
   break;
 
@@ -512,8 +520,8 @@ static USBH_Status USBH_HandleEnum(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
       int8_t possibleAddr = USBH_Dev_GetAvailAddress(pcore, pdev);
       if (possibleAddr > 0) {
         pdev->EnumState = ENUM_SET_ADDR;
-        dbg_printf(DBGMODE_TRACE, "ENUM_SET_ADDR %s\r\n", USBH_Dev_DebugPrint(pdev, 0));
         pdev->device_prop.address = possibleAddr;
+        //dbg_printf(DBGMODE_TRACE, "ENUM_SET_ADDR %s\r\n", USBH_Dev_DebugPrint(pdev, 0));
         vcp_printf("V%04XP%04XA%d:C%d:DevDesc:\r\n", pdev->device_prop.Dev_Desc.idVendor, pdev->device_prop.Dev_Desc.idProduct, pdev->device_prop.address, USB_DEVICE_DESC_SIZE);
         for (int k = 0; k < USB_DEVICE_DESC_SIZE; k++) {
           vcp_printf(" 0x%02X", pcore->host.Rx_Buffer[k]);
@@ -536,7 +544,7 @@ static USBH_Status USBH_HandleEnum(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
       /* user callback for device address assigned */
       ((USBH_Device_cb_TypeDef*)pdev->cb)->DeviceAddressAssigned(pcore, pdev);
       pdev->EnumState = ENUM_GET_CFG_DESC;
-      dbg_printf(DBGMODE_TRACE, "ENUM_GET_CFG_DESC %s\r\n", USBH_Dev_DebugPrint(pdev, 0));
+      //dbg_printf(DBGMODE_TRACE, "ENUM_GET_CFG_DESC %s\r\n", USBH_Dev_DebugPrint(pdev, 0));
 
       /* modify control channels to update device address */
       USBH_Modify_Channel (pcore,
@@ -563,7 +571,7 @@ static USBH_Status USBH_HandleEnum(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
                           USB_CONFIGURATION_DESC_SIZE) == USBH_OK)
     {
       pdev->EnumState = ENUM_GET_FULL_CFG_DESC;
-      dbg_printf(DBGMODE_TRACE, "ENUM_GET_FULL_CFG_DESC %s\r\n", USBH_Dev_DebugPrint(pdev, 0));
+      //dbg_printf(DBGMODE_TRACE, "ENUM_GET_FULL_CFG_DESC %s\r\n", USBH_Dev_DebugPrint(pdev, 0));
     }
     break;
 
@@ -585,7 +593,7 @@ static USBH_Status USBH_HandleEnum(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
 		vcp_printf("\r\n");
 
       pdev->EnumState = ENUM_GET_MFC_STRING_DESC; // commented out to skip
-      dbg_printf(DBGMODE_TRACE, "ENUM_GET_MFC_STRING_DESC %s\r\n", USBH_Dev_DebugPrint(pdev, 0));
+      //dbg_printf(DBGMODE_TRACE, "ENUM_GET_MFC_STRING_DESC %s\r\n", USBH_Dev_DebugPrint(pdev, 0));
       //pdev->EnumState = ENUM_SET_CONFIGURATION;
       //dbg_printf(DBGMODE_TRACE, "ENUM_SET_CONFIGURATION %s\r\n", USBH_Dev_DebugPrint(pdev, 0));
     }
@@ -669,7 +677,7 @@ static USBH_Status USBH_HandleEnum(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
   case ENUM_DEV_CONFIGURED:
     /* user callback for enumeration done */
     Status = USBH_OK;
-    dbg_printf(DBGMODE_TRACE, "ENUM_DEV_CONFIGURED %s Succeeded\r\n", USBH_Dev_DebugPrint(pdev, 0));
+    //dbg_printf(DBGMODE_TRACE, "ENUM_DEV_CONFIGURED %s Succeeded\r\n", USBH_Dev_DebugPrint(pdev, 0));
     break;
 
   default:
@@ -698,13 +706,16 @@ USBH_Status USBH_HandleControl (USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
   switch (pdev->Control.state)
   {
   case CTRL_SETUP:
+    if (pdev->Control.hc_num_out < 0 || pdev->Control.hc_num_in < 0) {
+        USBH_Dev_AllocControl(pcore, pdev);
+    }
     /* send a SETUP packet */
     USBH_CtlSendSetup (pcore,
 	                   pdev->Control.setup.d8 ,
 	                   pdev->Control.hc_num_out);
     pdev->Control.state = CTRL_SETUP_WAIT;
-    pdev->Control.timer = HCD_GetCurrentFrame(pcore);
-    pdev->Control.timeout = 500;
+    pdev->Control.timer = systick_1ms_cnt;
+    pdev->Control.timeout = DATA_STAGE_TIMEOUT;
     break;
 
   case CTRL_SETUP_WAIT:
@@ -747,7 +758,7 @@ USBH_Status USBH_HandleControl (USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
         }
       }
       /* Set the delay timer to enable timeout for data stage completion */
-      pdev->Control.timer = HCD_GetCurrentFrame(pcore);
+      pdev->Control.timer = systick_1ms_cnt;
     }
     else if(URB_Status == URB_ERROR)
     {
@@ -755,14 +766,10 @@ USBH_Status USBH_HandleControl (USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
       pdev->Control.state = CTRL_ERROR;
       pdev->Control.status = CTRL_XACTERR;
     }
-    else if (URB_Status == URB_IDLE && (HCD_GetCurrentFrame(pcore) - pdev->Control.timer) > pdev->Control.timeout)
+    else if (URB_Status == URB_IDLE && (systick_1ms_cnt - pdev->Control.timer) > pdev->Control.timeout)
     {
-      dbg_printf(DBGMODE_ERR, "USBH_HandleControl %s CTRL_SETUP_WAIT Timeout \r\n", USBH_Dev_DebugPrint(pdev, 0));
+      dbg_printf(DBGMODE_ERR, "USBH_HandleControl %s CTRL_SETUP_WAIT Timeout, HC_STATE %d %d, T %d %d %d\r\n", USBH_Dev_DebugPrint(pdev, 0), HCD_GetHCState(pcore, pdev->Control.hc_num_in), HCD_GetHCState(pcore, pdev->Control.hc_num_out), systick_1ms_cnt, pdev->Control.timer, pdev->Control.timeout);
       pdev->Control.state = CTRL_SETUP; // retry
-    }
-    else if (URB_Status == URB_IDLE)
-    {
-      //dbg_printf(DBGMODE_TRACE, "%s URB_Status == URB_IDLE, %d \r\n", USBH_Dev_DebugPrint(pdev, 0), (HCD_GetCurrentFrame(pcore) - pdev->Control.timer));
     }
     break;
 
@@ -774,7 +781,7 @@ USBH_Status USBH_HandleControl (USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
                         pdev->Control.hc_num_in);
 
     pdev->Control.state = CTRL_DATA_IN_WAIT;
-    //pdev->Control.timer = HCD_GetCurrentFrame(pcore);
+    pdev->Control.timer = systick_1ms_cnt;
     break;
 
   case CTRL_DATA_IN_WAIT:
@@ -800,11 +807,11 @@ USBH_Status USBH_HandleControl (USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
       pdev->Control.state = CTRL_ERROR;
       dbg_printf(DBGMODE_ERR, "USBH_HandleControl %s CTRL_DATA_IN_WAIT URB_Status == URB_ERROR, HC_STATE %d %d \r\n", USBH_Dev_DebugPrint(pdev, 0), HCD_GetHCState(pcore, pdev->Control.hc_num_in), HCD_GetHCState(pcore, pdev->Control.hc_num_out));
     }
-    else if ((HCD_GetCurrentFrame(pcore)- pdev->Control.timer) > pdev->Control.timeout)
+    else if (URB_Status == URB_IDLE && (systick_1ms_cnt - pdev->Control.timer) > pdev->Control.timeout)
     {
       /* timeout for IN transfer */
       pdev->Control.state = CTRL_ERROR;
-      dbg_printf(DBGMODE_ERR, "USBH_HandleControl %s CTRL_DATA_IN_WAIT Timeout \r\n", USBH_Dev_DebugPrint(pdev, 0));
+      dbg_printf(DBGMODE_ERR, "USBH_HandleControl %s CTRL_DATA_IN_WAIT Timeout %d %d %d\r\n", USBH_Dev_DebugPrint(pdev, 0), systick_1ms_cnt, pdev->Control.timer, pdev->Control.timeout);
     }
     break;
 
@@ -822,7 +829,7 @@ USBH_Status USBH_HandleControl (USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
 
 
     pdev->Control.state = CTRL_DATA_OUT_WAIT;
-    //pdev->Control.timer = HCD_GetCurrentFrame(pcore);
+    pdev->Control.timer = systick_1ms_cnt;
     break;
 
   case CTRL_DATA_OUT_WAIT:
@@ -830,7 +837,6 @@ USBH_Status USBH_HandleControl (USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
     URB_Status = HCD_GetURB_State(pcore , pdev->Control.hc_num_out);
     if  (URB_Status == URB_DONE)
     { /* If the Setup Pkt is sent successful, then change the state */
-      pdev->Control.timer = HCD_GetCurrentFrame(pcore);
       pdev->Control.state = CTRL_STATUS_IN;
     }
 
@@ -866,7 +872,7 @@ USBH_Status USBH_HandleControl (USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
                          pdev->Control.hc_num_in);
 
     pdev->Control.state = CTRL_STATUS_IN_WAIT;
-    //pdev->Control.timer = HCD_GetCurrentFrame(pcore);
+    pdev->Control.timer = systick_1ms_cnt;
     break;
 
   case CTRL_STATUS_IN_WAIT:
@@ -885,19 +891,18 @@ USBH_Status USBH_HandleControl (USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
       pdev->Control.state = CTRL_ERROR;
       dbg_printf(DBGMODE_ERR, "USBH_HandleControl %s CTRL_STATUS_IN_WAIT URB_Status == URB_ERROR, HC_STATE %d %d \r\n", USBH_Dev_DebugPrint(pdev, 0), HCD_GetHCState(pcore, pdev->Control.hc_num_in), HCD_GetHCState(pcore, pdev->Control.hc_num_out));
     }
-
-    else if((HCD_GetCurrentFrame(pcore) - pdev->Control.timer) > pdev->Control.timeout)
-    {
-      pdev->Control.state = CTRL_ERROR;
-      dbg_printf(DBGMODE_ERR, "USBH_HandleControl %s CTRL_STATUS_IN_WAIT Timeout \r\n", USBH_Dev_DebugPrint(pdev, 0));
-    }
-     else if(URB_Status == URB_STALL)
+    else if(URB_Status == URB_STALL)
     {
       /* Control transfers completed, Exit the State Machine */
       pdev->gState =   pdev->gStateBkp;
       pdev->Control.status = CTRL_STALL;
       status = USBH_NOT_SUPPORTED;
       dbg_printf(DBGMODE_ERR, "USBH_HandleControl %s CTRL_STATUS_IN_WAIT URB_Status == URB_STALL \r\n", USBH_Dev_DebugPrint(pdev, 0));
+    }
+    else if(URB_Status == URB_IDLE && (systick_1ms_cnt - pdev->Control.timer) > pdev->Control.timeout)
+    {
+      pdev->Control.state = CTRL_ERROR;
+      dbg_printf(DBGMODE_ERR, "USBH_HandleControl %s CTRL_STATUS_IN_WAIT Timeout %d %d %d\r\n", USBH_Dev_DebugPrint(pdev, 0), systick_1ms_cnt, pdev->Control.timer, pdev->Control.timeout);
     }
     break;
 
@@ -909,7 +914,7 @@ USBH_Status USBH_HandleControl (USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
                       pdev->Control.hc_num_out);
 
     pdev->Control.state = CTRL_STATUS_OUT_WAIT;
-    //pdev->Control.timer = HCD_GetCurrentFrame(pcore);
+    pdev->Control.timer = systick_1ms_cnt;
     break;
 
   case CTRL_STATUS_OUT_WAIT:

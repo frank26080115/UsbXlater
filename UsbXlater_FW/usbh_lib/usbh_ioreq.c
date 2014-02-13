@@ -128,7 +128,7 @@ USBH_Status USBH_CtlReq     (USB_OTG_CORE_HANDLE *pcore,
     }
     else if  (pdev->Control.state == CTRL_ERROR)
     {
-      dbg_printf(DBGMODE_ERR, "USBH_CtlReq %s state == CTRL_ERROR \r\n", USBH_Dev_DebugPrint(pdev, 0));
+      dbg_printf(DBGMODE_ERR, "USBH_CtlReq %s state == CTRL_ERROR\r\n", USBH_Dev_DebugPrint(pdev, 0));
       /* Failure Mode */
       pdev->RequestState = CMD_SEND;
       status = USBH_FAIL;

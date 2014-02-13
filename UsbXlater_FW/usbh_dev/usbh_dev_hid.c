@@ -17,6 +17,10 @@
 static void USBH_ParseHIDDesc (USBH_HIDDesc_TypeDef *desc, uint8_t *buf);
 static USBH_Status USBH_HID_Handle(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *phost, uint8_t intf);
 static USBH_Status USBH_HID_ClassRequest(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *phost, uint8_t intf);
+static USBH_Status USBH_Get_HID_ReportDescriptor_Blocking (USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev, uint16_t intf, uint16_t length);
+static USBH_Status USBH_Get_HID_Descriptor_Blocking (USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev, uint8_t intf);
+static USBH_Status USBH_Set_Idle_Blocking (USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev, uint8_t intf, uint8_t duration, uint8_t reportId);
+static USBH_Status USBH_Set_Protocol_Blocking (USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev, uint8_t intf, uint8_t protocol);
 static USBH_Status USBH_Get_HID_ReportDescriptor (USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev, uint16_t intf, uint16_t length);
 static USBH_Status USBH_Get_HID_Descriptor (USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev, uint8_t intf);
 static USBH_Status USBH_Set_Idle (USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev, uint8_t intf, uint8_t duration, uint8_t reportId);
@@ -43,7 +47,7 @@ USBH_Device_cb_TypeDef USBH_Dev_HID_CB = {
 	USBH_Dev_HID_UnrecoveredError,
 };
 
-char USBH_Dev_Has_HID;
+char USBH_Dev_HID_Cnt;
 
 void HID_Default_Data_Handler(void* p_io, uint8_t* data, uint16_t len)
 {
@@ -97,6 +101,9 @@ void USBH_Dev_HID_DeInitDev(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
 USBH_Status USBH_Dev_HID_Task(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
 {
 	HID_Data_t* HID_Data = pdev->Usr_Data;
+	if (HID_Data->custom_task != 0) {
+		HID_Data->custom_task(pcore, pdev);
+	}
 	uint8_t numIntf = pdev->device_prop.Cfg_Desc.bNumInterfaces;
 	if (numIntf == 0) {
 		dbg_printf(DBGMODE_ERR, "Warning: HID_Task device with 0 interfaces! \r\n");
@@ -138,7 +145,11 @@ void USBH_Dev_HID_ResetDevice(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
 
 void USBH_Dev_HID_DeviceDisconnected(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
 {
-
+	HID_Data_t* HID_Data = pdev->Usr_Data;
+	if (HID_Data->deinit_handler != 0) {
+		HID_Data->deinit_handler(pcore, pdev);
+	}
+	USBH_Dev_HID_Cnt--;
 }
 
 void USBH_Dev_HID_OverCurrentDetected(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
@@ -175,9 +186,9 @@ void USBH_Dev_HID_EnumerationDone(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
 
 	uint8_t numIntf = pdev->device_prop.Cfg_Desc.bNumInterfaces;
 	char isHid = 0;
-	pdev->Usr_Data = malloc(sizeof(HID_Data_t));
+	pdev->Usr_Data = calloc(1, sizeof(HID_Data_t));
 	HID_Data_t* HID_Data = pdev->Usr_Data;
-	HID_Data->io = calloc(numIntf, sizeof(USBH_DevIO_t));
+	HID_Data->io = calloc(numIntf, sizeof(USBH_DevIO_t*));
 	HID_Data->ioIdx = 0;
 
 	dbg_printf(DBGMODE_DEBUG, "USBH_Dev_HID_EnumerationDone, bNumInterfaces: %d\r\n", numIntf);
@@ -191,25 +202,28 @@ void USBH_Dev_HID_EnumerationDone(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
 
 		isHid = 1;
 
-		USBH_DevD2H_DataHandler_t handler = 0;
+		USBH_DevD2H_DataHandler_t dataHandler = 0;
 		HID_Rpt_Parsing_Params_t* parser = 0;
 		uint8_t parserEp = 0;
 
 		if (pdev->device_prop.Dev_Desc.idVendor == SONY_VID && pdev->device_prop.Dev_Desc.idProduct == DUALSHOCK3_PID) {
 			// DUALSHOCK3
-			handler = USBH_DS3_Data_Handler;
+			dataHandler = USBH_DS3_Data_Handler;
 			dbg_printf(DBGMODE_TRACE, "Dualshock 3 Detected\r\n");
 		}
 		else if (pdev->device_prop.Dev_Desc.idVendor == SONY_VID && pdev->device_prop.Dev_Desc.idProduct == DUALSHOCK4_PID) {
 			// DUALSHOCK4
-			handler = USBH_DS4_Data_Handler;
+			dataHandler = USBH_DS4_Data_Handler;
+			HID_Data->init_handler = USBH_DS4_Init_Handler;
+			HID_Data->deinit_handler = USBH_DS4_DeInit_Handler;
+			HID_Data->custom_task = USBH_DS4_Task;
 			dbg_printf(DBGMODE_TRACE, "Dualshock 4 Detected\r\n");
 		}
 		// TODO handle others, like Xbox controllers
 		else {
 			// other, probably keyboard or mouse
 			parser = malloc(sizeof(HID_Rpt_Parsing_Params_t));
-			handler = HID_Default_Data_Handler;
+			dataHandler = HID_Default_Data_Handler;
 		}
 
 		uint8_t maxEP = ( (pdev->device_prop.Itf_Desc[i].bNumEndpoints <= USBH_MAX_NUM_ENDPOINTS) ?
@@ -232,7 +246,7 @@ void USBH_Dev_HID_EnumerationDone(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
 							0
 #endif
 							,
-							handler, parser
+							dataHandler, parser
 					);
 					parserEp = epDesc->bEndpointAddress;
 				}
@@ -245,7 +259,7 @@ void USBH_Dev_HID_EnumerationDone(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
 		{
 			USBH_HIDDesc_TypeDef hidDesc;
 
-			status = USBH_Get_HID_Descriptor (pcore, pdev, i);
+			status = USBH_Get_HID_Descriptor_Blocking (pcore, pdev, i);
 			if (status == USBH_OK) {
 				USBH_ParseHIDDesc(&hidDesc, pcore->host.Rx_Buffer);
 				vcp_printf("%sI%d:C%d:HIDDesc:\r\n", USBH_Dev_DebugPrint(pdev, 0), i, USB_HID_DESC_SIZE);
@@ -255,16 +269,16 @@ void USBH_Dev_HID_EnumerationDone(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
 				vcp_printf("\r\n");
 			}
 			else {
-				dbg_printf(DBGMODE_ERR, "USBH_Get_HID_Descriptor failed status: 0x%04X\r\n", status);
+				dbg_printf(DBGMODE_ERR, "USBH_Get_HID_Descriptor_Blocking failed status: 0x%04X\r\n", status);
 				USBH_ErrorHandle(pcore, pdev, status);
 				continue;
 			}
 
 			uint8_t repIdList[8] = { 0, 0, 0, 0, 0, 0, 0, 0};
 
-			status = USBH_Get_HID_ReportDescriptor(pcore , pdev, i, hidDesc.wItemLength);
+			status = USBH_Get_HID_ReportDescriptor_Blocking(pcore , pdev, i, hidDesc.wItemLength);
 			if (status == USBH_OK) {
-				dbg_printf(DBGMODE_DEBUG, "USBH_Get_HID_ReportDescriptor OK: 0x%04X\r\n", status);
+				dbg_printf(DBGMODE_DEBUG, "USBH_Get_HID_ReportDescriptor_Blocking OK: 0x%04X\r\n", status);
 
 				vcp_printf("%sI%d:C%d:ReptDesc:", USBH_Dev_DebugPrint(pdev, 0), i, hidDesc.wItemLength);
 				for (uint8_t k = 0; k < hidDesc.wItemLength; k++) {
@@ -272,12 +286,13 @@ void USBH_Dev_HID_EnumerationDone(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
 				}
 				vcp_printf("\r\n");
 
+				HID_Rpt_Parsing_Params_Reset(parser);
 				HID_Rpt_Desc_Parse(pcore->host.Rx_Buffer, hidDesc.wItemLength, parser, parserEp, repIdList);
 				//dbg_printf(DBGMODE_DEBUG, "HID_Rpt_Desc_Parse Complete \r\n");
 				HID_Rpt_Parsing_Params_Debug_Dump(parser);
 			}
 			else {
-				dbg_printf(DBGMODE_ERR, "USBH_Get_HID_ReportDescriptor failed status: 0x%04X\r\n", status);
+				dbg_printf(DBGMODE_ERR, "USBH_Get_HID_ReportDescriptor_Blocking failed status: 0x%04X\r\n", status);
 				USBH_ErrorHandle(pcore, pdev, status);
 				continue;
 			}
@@ -289,15 +304,15 @@ void USBH_Dev_HID_EnumerationDone(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
 				if (rid > 0)
 				{
 					hasSetIdle = 1;
-					status = USBH_Set_Idle (pcore, pdev, i, 0, rid);
+					status = USBH_Set_Idle_Blocking (pcore, pdev, i, 0, rid);
 					if (status == USBH_OK) {
-						dbg_printf(DBGMODE_DEBUG, "USBH_Set_Idle[%d] OK: 0x%04X\r\n", rid, status);
+						dbg_printf(DBGMODE_DEBUG, "USBH_Set_Idle_Blocking[%d] OK: 0x%04X\r\n", rid, status);
 					}
-					else if(status == USBH_NOT_SUPPORTED) {
-						dbg_printf(DBGMODE_DEBUG, "USBH_Set_Idle[%d] NOT SUPPORTED\r\n", rid);
+					else if(status == USBH_NOT_SUPPORTED || status == USBH_STALL) {
+						dbg_printf(DBGMODE_DEBUG, "USBH_Set_Idle_Blocking[%d] NOT SUPPORTED\r\n", rid);
 					}
 					else {
-						dbg_printf(DBGMODE_ERR, "USBH_Set_Idle[%d] failed status: 0x%04X\r\n", rid, status);
+						dbg_printf(DBGMODE_ERR, "USBH_Set_Idle_Blocking[%d] failed status: 0x%04X\r\n", rid, status);
 						USBH_ErrorHandle(pcore, pdev, status);
 					}
 				}
@@ -310,15 +325,15 @@ void USBH_Dev_HID_EnumerationDone(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
 
 			if (hasSetIdle == 0)
 			{
-				status = USBH_Set_Idle (pcore, pdev, i, 0, 0);
+				status = USBH_Set_Idle_Blocking (pcore, pdev, i, 0, 0);
 				if (status == USBH_OK) {
-					dbg_printf(DBGMODE_DEBUG, "USBH_Set_Idle[only %d] OK: 0x%04X\r\n", 0, status);
+					dbg_printf(DBGMODE_DEBUG, "USBH_Set_Idle_Blocking[only %d] OK: 0x%04X\r\n", 0, status);
 				}
-				else if(status == USBH_NOT_SUPPORTED) {
-					dbg_printf(DBGMODE_DEBUG, "USBH_Set_Idle[only %d] NOT SUPPORTED\r\n", 0);
+				else if(status == USBH_NOT_SUPPORTED || status == USBH_STALL) {
+					dbg_printf(DBGMODE_DEBUG, "USBH_Set_Idle_Blocking[only %d] NOT SUPPORTED\r\n", 0);
 				}
 				else {
-					dbg_printf(DBGMODE_ERR, "USBH_Set_Idle[only %d] failed status: 0x%04X\r\n", 0, status);
+					dbg_printf(DBGMODE_ERR, "USBH_Set_Idle_Blocking[only %d] failed status: 0x%04X\r\n", 0, status);
 					USBH_ErrorHandle(pcore, pdev, status);
 				}
 			}
@@ -330,12 +345,12 @@ void USBH_Dev_HID_EnumerationDone(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
 		}
 		else
 		{
-			status = USBH_Set_Protocol(pcore, pdev, i, 0); // this sets the protocol = "report"
+			status = USBH_Set_Protocol_Blocking(pcore, pdev, i, 0); // this sets the protocol = "report"
 			if (status == USBH_OK) {
-				dbg_printf(DBGMODE_DEBUG, "USBH_Set_Protocol OK: 0x%04X\r\n", status);
+				dbg_printf(DBGMODE_DEBUG, "USBH_Set_Protocol_Blocking OK: 0x%04X\r\n", status);
 			}
 			else {
-				dbg_printf(DBGMODE_ERR, "USBH_Set_Protocol failed status: 0x%04X\r\n", status);
+				dbg_printf(DBGMODE_ERR, "USBH_Set_Protocol_Blocking failed status: 0x%04X\r\n", status);
 				USBH_ErrorHandle(pcore, pdev, status);
 			}
 		}
@@ -348,6 +363,12 @@ void USBH_Dev_HID_EnumerationDone(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
 		pdev->Usr_Data = 0;
 		pdev->cb = &USBH_Dev_CB_Default; // this will cause the device to not be serviced
 	}
+
+	if (HID_Data->init_handler != 0) {
+		HID_Data->init_handler(pcore, pdev);
+	}
+
+	USBH_Dev_HID_Cnt++;
 }
 
 void USBH_Dev_HID_DeviceNotSupported(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
@@ -360,10 +381,10 @@ void USBH_Dev_HID_UnrecoveredError(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev)
 
 }
 
-static USBH_Status USBH_Get_HID_ReportDescriptor (USB_OTG_CORE_HANDLE *pcore,
-                                                  USBH_DEV *pdev,
-                                                  uint16_t intf,
-                                                  uint16_t length)
+static USBH_Status USBH_Get_HID_ReportDescriptor_Blocking (USB_OTG_CORE_HANDLE *pcore,
+                                                           USBH_DEV *pdev,
+                                                           uint16_t intf,
+                                                           uint16_t length)
 {
   USBH_Status status;
 
@@ -383,6 +404,49 @@ static USBH_Status USBH_Get_HID_ReportDescriptor (USB_OTG_CORE_HANDLE *pcore,
   In case, for supporting Non-Boot Protocol devices and output reports,
   user may parse the report descriptor*/
 
+  return status;
+}
+
+static USBH_Status USBH_Get_HID_ReportDescriptor (USB_OTG_CORE_HANDLE *pcore,
+                                                  USBH_DEV *pdev,
+                                                  uint16_t intf,
+                                                  uint16_t length)
+{
+  USBH_Status status;
+
+  status = USBH_GetDescriptor(pcore,
+                              pdev,
+                              USB_REQ_RECIPIENT_INTERFACE | USB_REQ_TYPE_STANDARD,
+                              USB_DESC_HID_REPORT,
+                              intf,
+                              pcore->host.Rx_Buffer,
+                              length
+                              );
+
+  /* HID report descriptor is available in pcore->host.Rx_Buffer.
+  In case of USB Boot Mode devices for In report handling ,
+  HID report descriptor parsing is not required.
+  In case, for supporting Non-Boot Protocol devices and output reports,
+  user may parse the report descriptor*/
+
+  return status;
+}
+
+static USBH_Status USBH_Get_HID_Descriptor_Blocking (USB_OTG_CORE_HANDLE *pcore,
+                                                     USBH_DEV *pdev,
+                                                     uint8_t intf)
+{
+
+  USBH_Status status;
+
+  status = USBH_GetDescriptor_Blocking(pcore,
+                              pdev,
+                              USB_REQ_RECIPIENT_INTERFACE | USB_REQ_TYPE_STANDARD,
+                              USB_DESC_HID,
+                              intf,
+                              pcore->host.Rx_Buffer,
+                              USB_HID_DESC_SIZE
+                              );
 
   return status;
 }
@@ -394,20 +458,19 @@ static USBH_Status USBH_Get_HID_Descriptor (USB_OTG_CORE_HANDLE *pcore,
 
   USBH_Status status;
 
-  status = USBH_GetDescriptor_Blocking(pcore,
+  status = USBH_GetDescriptor(pcore,
                               pdev,
-                              USB_REQ_RECIPIENT_INTERFACE
-                                | USB_REQ_TYPE_STANDARD,
-                                USB_DESC_HID,
-                                intf,
-                                pcore->host.Rx_Buffer,
-                                USB_HID_DESC_SIZE
-                                );
+                              USB_REQ_RECIPIENT_INTERFACE | USB_REQ_TYPE_STANDARD,
+                              USB_DESC_HID,
+                              intf,
+                              pcore->host.Rx_Buffer,
+                              USB_HID_DESC_SIZE
+                              );
 
   return status;
 }
 
-static USBH_Status USBH_Set_Idle (USB_OTG_CORE_HANDLE *pcore,
+static USBH_Status USBH_Set_Idle_Blocking (USB_OTG_CORE_HANDLE *pcore,
                                   USBH_DEV *pdev,
                                   uint8_t intf,
                                   uint8_t duration,
@@ -427,17 +490,36 @@ static USBH_Status USBH_Set_Idle (USB_OTG_CORE_HANDLE *pcore,
   return USBH_CtlReq_Blocking(pcore, pdev, 0 , 0 );
 }
 
-USBH_Status USBH_Set_Report (USB_OTG_CORE_HANDLE *pcore,
-                                 USBH_DEV *pdev,
-                                    uint8_t intf,
-                                    uint8_t reportType,
-                                    uint8_t reportId,
-                                    uint8_t reportLen,
-                                    uint8_t* reportBuff)
+static USBH_Status USBH_Set_Idle (USB_OTG_CORE_HANDLE *pcore,
+                                  USBH_DEV *pdev,
+                                  uint8_t intf,
+                                  uint8_t duration,
+                                  uint8_t reportId)
 {
 
   pdev->Control.setup.b.bmRequestType = USB_H2D | USB_REQ_RECIPIENT_INTERFACE |\
     USB_REQ_TYPE_CLASS;
+
+
+  pdev->Control.setup.b.bRequest = USB_HID_SET_IDLE;
+  pdev->Control.setup.b.wValue.w = (duration << 8 ) | reportId;
+
+  pdev->Control.setup.b.wIndex.w = intf;
+  pdev->Control.setup.b.wLength.w = 0;
+
+  return USBH_CtlReq(pcore, pdev, 0 , 0 );
+}
+
+USBH_Status USBH_Set_Report_Blocking (USB_OTG_CORE_HANDLE *pcore,
+                                      USBH_DEV *pdev,
+                                      uint8_t intf,
+                                      uint8_t reportType,
+                                      uint8_t reportId,
+                                      uint8_t reportLen,
+                                      uint8_t* reportBuff)
+{
+
+  pdev->Control.setup.b.bmRequestType = USB_H2D | USB_REQ_RECIPIENT_INTERFACE | USB_REQ_TYPE_CLASS;
 
 
   pdev->Control.setup.b.bRequest = USB_HID_SET_REPORT;
@@ -449,13 +531,55 @@ USBH_Status USBH_Set_Report (USB_OTG_CORE_HANDLE *pcore,
   return USBH_CtlReq_Blocking(pcore, pdev, reportBuff , reportLen );
 }
 
-USBH_Status USBH_Get_Report (USB_OTG_CORE_HANDLE *pcore,
+USBH_Status USBH_Set_Report (USB_OTG_CORE_HANDLE *pcore,
                                  USBH_DEV *pdev,
                                     uint8_t intf,
                                     uint8_t reportType,
                                     uint8_t reportId,
                                     uint8_t reportLen,
                                     uint8_t* reportBuff)
+{
+
+  pdev->Control.setup.b.bmRequestType = USB_H2D | USB_REQ_RECIPIENT_INTERFACE | USB_REQ_TYPE_CLASS;
+
+
+  pdev->Control.setup.b.bRequest = USB_HID_SET_REPORT;
+  pdev->Control.setup.b.wValue.w = (reportType << 8 ) | reportId;
+
+  pdev->Control.setup.b.wIndex.w = intf;
+  pdev->Control.setup.b.wLength.w = reportLen;
+
+  return USBH_CtlReq(pcore, pdev, reportBuff , reportLen );
+}
+
+USBH_Status USBH_Get_Report_Blocking (USB_OTG_CORE_HANDLE *pcore,
+                                      USBH_DEV *pdev,
+                                      uint8_t intf,
+                                      uint8_t reportType,
+                                      uint8_t reportId,
+                                      uint8_t reportLen,
+                                      uint8_t* reportBuff)
+{
+
+  pdev->Control.setup.b.bmRequestType = USB_D2H | USB_REQ_RECIPIENT_INTERFACE | USB_REQ_TYPE_CLASS;
+
+
+  pdev->Control.setup.b.bRequest = USB_HID_REQ_GET_REPORT;
+  pdev->Control.setup.b.wValue.w = (reportType << 8 ) | reportId;
+
+  pdev->Control.setup.b.wIndex.w = intf;
+  pdev->Control.setup.b.wLength.w = reportLen;
+
+  return USBH_CtlReq_Blocking(pcore, pdev, reportBuff , reportLen );
+}
+
+USBH_Status USBH_Get_Report (USB_OTG_CORE_HANDLE *pcore,
+                             USBH_DEV *pdev,
+                             uint8_t intf,
+                             uint8_t reportType,
+                             uint8_t reportId,
+                             uint8_t reportLen,
+                             uint8_t* reportBuff)
 {
 
   pdev->Control.setup.b.bmRequestType = USB_D2H | USB_REQ_RECIPIENT_INTERFACE |\
@@ -468,18 +592,17 @@ USBH_Status USBH_Get_Report (USB_OTG_CORE_HANDLE *pcore,
   pdev->Control.setup.b.wIndex.w = intf;
   pdev->Control.setup.b.wLength.w = reportLen;
 
-  return USBH_CtlReq_Blocking(pcore, pdev, reportBuff , reportLen );
+  return USBH_CtlReq(pcore, pdev, reportBuff , reportLen );
 }
 
-static USBH_Status USBH_Set_Protocol(USB_OTG_CORE_HANDLE *pcore,
-                                     USBH_DEV *pdev,
-                                     uint8_t intf,
-                                     uint8_t protocol)
+static USBH_Status USBH_Set_Protocol_Blocking(USB_OTG_CORE_HANDLE *pcore,
+                                              USBH_DEV *pdev,
+                                              uint8_t intf,
+                                              uint8_t protocol)
 {
 
 
-  pdev->Control.setup.b.bmRequestType = USB_H2D | USB_REQ_RECIPIENT_INTERFACE |\
-    USB_REQ_TYPE_CLASS;
+  pdev->Control.setup.b.bmRequestType = USB_H2D | USB_REQ_RECIPIENT_INTERFACE | USB_REQ_TYPE_CLASS;
 
 
   pdev->Control.setup.b.bRequest = USB_HID_SET_PROTOCOL;
@@ -499,6 +622,35 @@ static USBH_Status USBH_Set_Protocol(USB_OTG_CORE_HANDLE *pcore,
   pdev->Control.setup.b.wLength.w = 0;
 
   return USBH_CtlReq_Blocking(pcore, pdev, 0 , 0 );
+}
+
+static USBH_Status USBH_Set_Protocol(USB_OTG_CORE_HANDLE *pcore,
+                                     USBH_DEV *pdev,
+                                     uint8_t intf,
+                                     uint8_t protocol)
+{
+
+
+  pdev->Control.setup.b.bmRequestType = USB_H2D | USB_REQ_RECIPIENT_INTERFACE | USB_REQ_TYPE_CLASS;
+
+
+  pdev->Control.setup.b.bRequest = USB_HID_SET_PROTOCOL;
+
+  if(protocol != 0)
+  {
+    /* Boot Protocol */
+    pdev->Control.setup.b.wValue.w = 0;
+  }
+  else
+  {
+    /*Report Protocol*/
+    pdev->Control.setup.b.wValue.w = 1;
+  }
+
+  pdev->Control.setup.b.wIndex.w = intf;
+  pdev->Control.setup.b.wLength.w = 0;
+
+  return USBH_CtlReq(pcore, pdev, 0 , 0 );
 }
 
 static void  USBH_ParseHIDDesc (USBH_HIDDesc_TypeDef *desc, uint8_t *buf)

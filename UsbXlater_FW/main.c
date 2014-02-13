@@ -23,6 +23,7 @@
 #include <usbh_lib/usbh_hcs.h>
 #include <usbd_lib/usbd_core.h>
 #include <usbh_dev/usbh_dev_manager.h>
+#include <usbh_dev/usbh_devio_manager.h>
 #include <usbh_dev/usbh_dev_inc_all.h>
 #include <usbd_dev/usbd_dev_inc_all.h>
 #include "usb_passthrough.h"
@@ -96,6 +97,8 @@ int main(void)
 	led_3_on(); delay_ms(150); led_3_off();
 	led_4_on(); delay_ms(150); led_4_off();
 
+	memset(&USB_OTG_ISR_Statistics, 0, sizeof(USB_OTG_ISR_Statistics_t));
+
 	//kbm2c_init();
 
 	USBD_ExPullUp_Idle();
@@ -107,6 +110,7 @@ int main(void)
 
 	USB_OTG_BSP_Init(0);
 
+	USBH_DevIOManager_Init();
 	USBH_Dev_AddrManager_Reset();
 	USBH_InitCore(&USB_OTG_Core_host, USB_OTG_FS_CORE_ID);
 	USBH_DeAllocate_AllChannel(&USB_OTG_Core_host);
@@ -123,7 +127,7 @@ int main(void)
 	DCD_DevConnect(&USB_OTG_Core_dev);
 	while (delay_1ms_cnt > 0) dbgwdg_feed();
 
-	USBH_Dev_Has_HID = 0;
+	USBH_Dev_HID_Cnt = 0;
 	USBD_CDC_IsReady = 0;
 
 	enum host_intf_state_ {
