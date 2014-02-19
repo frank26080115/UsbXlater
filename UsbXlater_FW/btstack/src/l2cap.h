@@ -197,7 +197,6 @@ typedef struct l2cap_signaling_response {
 
 void l2cap_block_new_credits(uint8_t blocked);
 int  l2cap_can_send_packet_now(uint16_t local_cid);    // non-blocking UART write
-int  l2cap_can_send_fragment_now(uint16_t local_cid);  // non-blocking UART write
 
 // get outgoing buffer and prepare data
 uint8_t *l2cap_get_outgoing_buffer(void);
@@ -205,10 +204,6 @@ uint8_t *l2cap_get_outgoing_buffer(void);
 int l2cap_send_prepared(uint16_t local_cid, uint16_t len);
 
 int l2cap_send_prepared_connectionless(uint16_t handle, uint16_t cid, uint16_t len);
-
-int l2cap_fragment_waiting();
-
-hci_con_handle_t l2cap_fragment_waiting_handle();
 
 // Bluetooth 4.0 - allows to register handler for Attribute Protocol and Security Manager Protocol
 void l2cap_register_fixed_channel(btstack_packet_handler_t packet_handler, uint16_t channel_id);

@@ -13,6 +13,8 @@
 #include <btstack/hci_transport_stm32usbh.h>
 #include <btstack/hci_cmds.h>
 
+USBH_DEV* USBH_Dev_BtHci_Debug_PDEV = 0;
+
 USBH_Device_cb_TypeDef USBH_Dev_BtHci_CB = {
 	USBH_Dev_BtHci_DeInitDev,
 	USBH_Dev_BtHci_Task,
@@ -55,7 +57,7 @@ void USBH_Dev_BtHci_D2HIntf_EventHandler(void* p_io, uint8_t* data, uint16_t len
 {
 	USBH_DevIO_t* p_in = (USBH_DevIO_t*)p_io;
 	UsbHci_Data_t* UsbHci_Data = (UsbHci_Data_t*)p_in->pdev->Usr_Data;
-	dbg_printf(DBGMODE_TRACE, "USB HCI Event 0x%02X 0x%02X (len %d)\r\n", data[0], data[1], len);
+	//dbg_printf(DBGMODE_TRACE, "USB HCI Event 0x%02X 0x%02X (len %d)\r\n", data[0], data[1], len);
 	UsbHci_Data->packet_handler(HCI_EVENT_PACKET, data, len);
 }
 
@@ -70,9 +72,7 @@ USBH_Status USBH_Dev_BtHci_Task(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 		UsbHci_Data->ioIdx++;
 	}
 
-	btproxy_task();
-
-	if (UsbHci_Data->dataOutIO->state != UIOSTATE_NEXT)
+	if (UsbHci_Data->dataOutIO->state != UIOSTATE_NEXT || UsbHci_Data->dataOutIO->remaining > 0)
 	{
 		USBH_DevIO_Task(UsbHci_Data->dataOutIO);
 	}
@@ -92,8 +92,18 @@ USBH_Status USBH_Dev_BtHci_Task(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 	}
 	else
 	{
+		btproxy_task();
 		UsbHci_Data->ioIdx = 1;
 	}
+	//dbg_trace_if(dbg_cnt == 234);
+
+	//*
+	static uint32_t ts;
+	if ((systick_1ms_cnt - ts) > 5000) {
+		ts = systick_1ms_cnt;
+
+	}
+	//*/
 	return USBH_OK;
 }
 
@@ -156,6 +166,8 @@ void USBH_Dev_BtHci_ConfigurationDescAvailable(USB_OTG_CORE_HANDLE *pcore , USBH
 
 void USBH_Dev_BtHci_EnumerationDone(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 {
+	dbg_obj = pdev;
+
 	dbg_printf(DBGMODE_TRACE, "UsbHci_EnumerationDone %s\r\n", USBH_Dev_DebugPrint(pdev, 0));
 
 	if (pdev->Usr_Data != 0) {
@@ -183,7 +195,7 @@ void USBH_Dev_BtHci_EnumerationDone(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 		{
 			USBH_EpDesc_TypeDef* pep = &pdev->device_prop.Ep_Desc[intf][ep];
 
-			if (UsbHci_Data->eventIO == 0 && pep->bEndpointAddress == (0x01 | USB_D2H) && (pep->bmAttributes & EP_TYPE_MSK) == EP_TYPE_INTR)
+			if (UsbHci_Data->eventIO == 0 && (pep->bEndpointAddress & USB_EP_DIR_MSK) == USB_D2H && (pep->bmAttributes & EP_TYPE_MSK) == EP_TYPE_INTR)
 			{
 				UsbHci_Data->eventIO = USBH_DevIO_Manager_New(pcore, pdev, pep, dynamicHc, USBH_Dev_BtHci_D2HIntf_EventHandler, 0);
 				dbg_printf(DBGMODE_DEBUG, "USBHCI %s found event EP\r\n", USBH_Dev_DebugPrint(pdev, pep));
@@ -203,7 +215,7 @@ void USBH_Dev_BtHci_EnumerationDone(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 
 	if (UsbHci_Data->eventIO == 0)
 	{
-		dbg_printf(DBGMODE_DEBUG, "USBHCI %s did not find data in EP, creating manually...\r\n", USBH_Dev_DebugPrint(pdev, 0));
+		dbg_printf(DBGMODE_DEBUG, "USBHCI %s did not find event in EP, creating manually...\r\n", USBH_Dev_DebugPrint(pdev, 0));
 		USBH_EpDesc_TypeDef* pep = &pdev->device_prop.Ep_Desc[pdev->device_prop.Cfg_Desc.bNumInterfaces][1];
 		pep->bDescriptorType = USB_DESC_TYPE_ENDPOINT;
 		pep->bEndpointAddress = 0x01 | USB_D2H;
@@ -292,10 +304,20 @@ char USBH_Dev_BtHci_CanSendPacket(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 {
 	UsbHci_Data_t* UsbHci_Data = pdev->Usr_Data;
 	USBH_DevIO_t* io = UsbHci_Data->dataOutIO;
-	if (io->remaining > 0)
-		return 0;
-	if (io->state != UIOSTATE_NEXT)
-		return 0;
 
+	static uint8_t last_reason;
+
+	if (io->remaining > 0) {
+		if (last_reason != 1) dbg_printf(DBGMODE_DEBUG, "CanSendPacket refused due to waiting data\r\n");
+		last_reason = 1;
+		return 0;
+	}
+	if (io->state != UIOSTATE_NEXT) {
+		if (last_reason != 2) dbg_printf(DBGMODE_DEBUG, "CanSendPacket refused due to waiting transfer\r\n");
+		last_reason = 2;
+		return 0;
+	}
+
+	last_reason = 0;
 	return 1;
 }

@@ -2186,7 +2186,6 @@ void USB_OTG_SetEPStatus (USB_OTG_CORE_HANDLE *pcore , USB_OTG_EP *ep , uint32_t
 extern USB_OTG_CORE_HANDLE          USB_OTG_Core_dev;
 extern USB_OTG_CORE_HANDLE          USB_OTG_Core_host;
 extern USBH_DEV                     USBH_Dev;
-int OTG_FS_IRQHandler_Cnt = 0;
 
 void OTG_HS_IRQHandler(void)
 {
@@ -2201,8 +2200,9 @@ void OTG_HS_WKUP_IRQHandler(void)
 
 void OTG_FS_IRQHandler(void)
 {
-  OTG_FS_IRQHandler_Cnt++;
+  led_1_on();
   USBH_OTG_ISR_Handler(&USB_OTG_Core_host);
+  led_1_off();
 }
 
 /**

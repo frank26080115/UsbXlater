@@ -7,13 +7,13 @@
 #include <stdlib.h>
 #include <string.h>
 
-flashfilesystem_t flashfilesystem;
+flashfilesystem_t ffsys;
 
 int flashfile_init()
 {
 	int s;
 
-	// calling flashfile_findNvmFile will automatically set flashfilesystem.nvm_file
+	// calling flashfile_findNvmFile will automatically set ffsys.nvm_file
 	if (flashfile_findNvmFile() == 0) {
 		dbg_printf(DBGMODE_ERR, "NVM file not found in flash, will attempt to default\r\n");
 		s = flashfile_writeDefaultNvmFile();
@@ -23,7 +23,7 @@ int flashfile_init()
 		}
 	}
 
-	// calling flashfile_findMru will automatically set flashfilesystem.mru
+	// calling flashfile_findMru will automatically set ffsys.mru
 	if (flashfile_findMru() == 0) {
 		dbg_printf(DBGMODE_ERR, "MRU entry not found in flash, will attempt to default\r\n");
 		s = flashfile_writeMru(1);
@@ -33,20 +33,20 @@ int flashfile_init()
 		}
 	}
 
-	memcpy(flashfilesystem.cache, flashfilesystem.nvm_file, sizeof(nvm_file_t));
-	flashfilesystem.cache_dirty = 0;
+	memcpy(ffsys.cache, ffsys.nvm_file, sizeof(nvm_file_t));
+	ffsys.cache_dirty = 0;
 
 	return 0;
 }
 
 void flashfile_cacheFlush()
 {
-	if (flashfilesystem.cache_dirty != 0) {
+	if (ffsys.cache_dirty != 0) {
 		dbg_printf(DBGMODE_DEBUG, "flashfile_cacheFlush, cache is dirty\r\n");
-		flashfile_writeNvmFile((nvm_file_t*)flashfilesystem.cache);
+		flashfile_writeNvmFile((nvm_file_t*)ffsys.cache);
 	}
-	memcpy(flashfilesystem.cache, flashfilesystem.nvm_file, sizeof(nvm_file_t));
-	flashfilesystem.cache_dirty = 0;
+	memcpy(ffsys.cache, ffsys.nvm_file, sizeof(nvm_file_t));
+	ffsys.cache_dirty = 0;
 }
 
 void flashfile_sectorDump()
@@ -127,7 +127,8 @@ void flashfile_sectorDump()
 
 nvm_file_t* flashfile_findNvmFile()
 {
-	uint32_t magic = version_crc() ^ FLASHFILE_MAGIC;
+	uint32_t magic = FLASHFILE_MAGIC;
+	//magic ^= version_crc();
 
 	for (uint32_t i = FLASHFILE_PAGE_START; i < FLASHFILE_PAGE_END - sizeof(nvm_file_t) - sizeof(uint32_t); i++)
 	{
@@ -139,7 +140,7 @@ nvm_file_t* flashfile_findNvmFile()
 			dbg_printf(DBGMODE_DEBUG, "crc calculated = 0x%08X, crc read = 0x%08X\r\n", crc, possibleFile->crc);
 			if (possibleFile->crc == crc) {
 				dbg_printf(DBGMODE_DEBUG, "NVM file CRC matches\r\n");
-				flashfilesystem.nvm_file = possibleFile;
+				ffsys.nvm_file = possibleFile;
 				return possibleFile;
 			}
 		}
@@ -150,12 +151,12 @@ nvm_file_t* flashfile_findNvmFile()
 
 mru_t* flashfile_findMru()
 {
-	if ((uint32_t)flashfilesystem.nvm_file < FLASHFILE_PAGE_START || (uint32_t)flashfilesystem.nvm_file >= FLASHFILE_PAGE_END) {
+	if ((uint32_t)ffsys.nvm_file < FLASHFILE_PAGE_START || (uint32_t)ffsys.nvm_file >= FLASHFILE_PAGE_END) {
 		dbg_printf(DBGMODE_ERR, "Error: flashfile_findMru called without a valid nvm file location\r\n");
 		return 0;
 	}
 
-	for (uint32_t i = ((uint32_t)flashfilesystem.nvm_file) + sizeof(nvm_file_t); i < FLASHFILE_PAGE_END; i++)
+	for (uint32_t i = ((uint32_t)ffsys.nvm_file) + sizeof(nvm_file_t); i < FLASHFILE_PAGE_END; i++)
 	{
 		// check if the entry location is all valid (FF means blank, 0 means invalid)
 		char is0 = 1;
@@ -174,9 +175,9 @@ mru_t* flashfile_findMru()
 
 		if (is0 == 0 && isFF == 0)
 		{
-			flashfilesystem.mru = (mru_t*)i;
-			dbg_printf(DBGMODE_DEBUG, "flashfile_findMru found entry at 0x%08X, data 0x%08X\r\n", i, *flashfilesystem.mru);
-			return flashfilesystem.mru;
+			ffsys.mru = (mru_t*)i;
+			dbg_printf(DBGMODE_DEBUG, "flashfile_findMru found entry at 0x%08X, data 0x%08X\r\n", i, *ffsys.mru);
+			return ffsys.mru;
 		}
 	}
 
@@ -188,12 +189,12 @@ int flashfile_writeMru(mru_t data)
 	FLASH_Status status;
 	int retry, busyRetry;
 
-	if (flashfilesystem.cache_dirty != 0) {
+	if (ffsys.cache_dirty != 0) {
 		dbg_printf(DBGMODE_DEBUG, "flashfile_writeMru, cache is dirty\r\n");
-		flashfile_writeNvmFile((nvm_file_t*)flashfilesystem.cache);
+		flashfile_writeNvmFile((nvm_file_t*)ffsys.cache);
 	}
 
-	if ((uint32_t)flashfilesystem.mru > FLASHFILE_PAGE_END - sizeof(mru_t))
+	if ((uint32_t)ffsys.mru > FLASHFILE_PAGE_END - sizeof(mru_t))
 	{
 		// there's no more room for another MRU entry
 		// so we will wipe the sector and start from the top
@@ -201,10 +202,10 @@ int flashfile_writeMru(mru_t data)
 		dbg_printf(DBGMODE_DEBUG, "flashfile_writeMru, no more room\r\n");
 
 		// save the previous info
-		nvm_file_t* cache = (nvm_file_t*)flashfilesystem.cache;
+		nvm_file_t* cache = (nvm_file_t*)ffsys.cache;
 		uint8_t* cacheData = (uint8_t*)cache;
-		memcpy(cache, flashfilesystem.nvm_file, sizeof(nvm_file_t));
-		flashfilesystem.cache_dirty = 0;
+		memcpy(cache, ffsys.nvm_file, sizeof(nvm_file_t));
+		ffsys.cache_dirty = 0;
 
 		// refresh magic and CRC just in case
 		uint32_t magic = version_crc() ^ FLASHFILE_MAGIC;
@@ -261,35 +262,35 @@ int flashfile_writeMru(mru_t data)
 				return -2;
 			}
 		}
-		flashfilesystem.nvm_file = (nvm_file_t*)FLASHFILE_PAGE_START; // set the new start location of previous info
+		ffsys.nvm_file = (nvm_file_t*)FLASHFILE_PAGE_START; // set the new start location of previous info
 
 		// MRU should be placed immediately after the nvm file
-		flashfilesystem.mru = (mru_t*)(((int)flashfilesystem.nvm_file) + sizeof(nvm_file_t));
+		ffsys.mru = (mru_t*)(((int)ffsys.nvm_file) + sizeof(nvm_file_t));
 	}
 	else
 	{
 		// there is enough room available for another MRU entry
 		FLASH_Unlock();
 
-		if ((uint32_t)flashfilesystem.mru > FLASHFILE_PAGE_START && (uint32_t)flashfilesystem.mru <= FLASHFILE_PAGE_END)
+		if ((uint32_t)ffsys.mru > FLASHFILE_PAGE_START && (uint32_t)ffsys.mru <= FLASHFILE_PAGE_END)
 		{
-			dbg_printf(DBGMODE_DEBUG, "flashfile_writeMru clearing old MRU at addr 0x%08X\r\n", flashfilesystem.mru);
+			dbg_printf(DBGMODE_DEBUG, "flashfile_writeMru clearing old MRU at addr 0x%08X\r\n", ffsys.mru);
 
 			retry = busyRetry = 0;
 			do
 			{
 				// destroy the previous MRU entry
 				if (sizeof(mru_t) == sizeof(uint8_t)) {
-					status = FLASH_ProgramByte((uint32_t)flashfilesystem.mru, 0);
+					status = FLASH_ProgramByte((uint32_t)ffsys.mru, 0);
 				}
 				else if (sizeof(mru_t) == sizeof(uint16_t)) {
-					status = FLASH_ProgramHalfWord((uint32_t)flashfilesystem.mru, 0);
+					status = FLASH_ProgramHalfWord((uint32_t)ffsys.mru, 0);
 				}
 				else if (sizeof(mru_t) == sizeof(uint32_t)) {
-					status = FLASH_ProgramWord((uint32_t)flashfilesystem.mru, 0);
+					status = FLASH_ProgramWord((uint32_t)ffsys.mru, 0);
 				}
 				else if (sizeof(mru_t) == sizeof(uint64_t)) {
-					status = FLASH_ProgramDoubleWord((uint32_t)flashfilesystem.mru, 0);
+					status = FLASH_ProgramDoubleWord((uint32_t)ffsys.mru, 0);
 				}
 
 				if (status == FLASH_BUSY)
@@ -299,7 +300,7 @@ int flashfile_writeMru(mru_t data)
 				else if (status != FLASH_COMPLETE)
 				{
 					retry++; busyRetry = 0;
-					dbg_printf(DBGMODE_ERR, "Error flashfile_writeMru unable to destroy MRU at address 0x%08X, status = 0x%08X on attempt %d\r\n", (uint32_t)flashfilesystem.mru, status, retry);
+					dbg_printf(DBGMODE_ERR, "Error flashfile_writeMru unable to destroy MRU at address 0x%08X, status = 0x%08X on attempt %d\r\n", (uint32_t)ffsys.mru, status, retry);
 				}
 			}
 			while (retry < FLASHFILE_RETRY_MAX && busyRetry < FLASHFILE_BUSY_MAX && status != FLASH_COMPLETE);
@@ -311,31 +312,31 @@ int flashfile_writeMru(mru_t data)
 				return -3;
 			}
 
-			flashfilesystem.mru = &(flashfilesystem.mru[1]); // update address to next slot
+			ffsys.mru = &(ffsys.mru[1]); // update address to next slot
 		}
 		else
 		{
 			// MRU should be placed immediately after the nvm file
-			flashfilesystem.mru = (mru_t*)(((int)flashfilesystem.nvm_file) + sizeof(nvm_file_t));
+			ffsys.mru = (mru_t*)(((int)ffsys.nvm_file) + sizeof(nvm_file_t));
 		}
 	}
 
-	dbg_printf(DBGMODE_DEBUG, "flashfile_writeMru writing to addr 0x%08X data 0x%08X\r\n", flashfilesystem.mru, data);
+	dbg_printf(DBGMODE_DEBUG, "flashfile_writeMru writing to addr 0x%08X data 0x%08X\r\n", ffsys.mru, data);
 
 	retry = busyRetry = 0;
 	do
 	{
 		if (sizeof(mru_t) == sizeof(uint8_t)) {
-			status = FLASH_ProgramByte((uint32_t)flashfilesystem.mru, (uint8_t)data);
+			status = FLASH_ProgramByte((uint32_t)ffsys.mru, (uint8_t)data);
 		}
 		else if (sizeof(mru_t) == sizeof(uint16_t)) {
-			status = FLASH_ProgramHalfWord((uint32_t)flashfilesystem.mru, (uint16_t)data);
+			status = FLASH_ProgramHalfWord((uint32_t)ffsys.mru, (uint16_t)data);
 		}
 		else if (sizeof(mru_t) == sizeof(uint32_t)) {
-			status = FLASH_ProgramWord((uint32_t)flashfilesystem.mru, (uint32_t)data);
+			status = FLASH_ProgramWord((uint32_t)ffsys.mru, (uint32_t)data);
 		}
 		else if (sizeof(mru_t) == sizeof(uint64_t)) {
-			status = FLASH_ProgramDoubleWord((uint32_t)flashfilesystem.mru, (uint64_t)data);
+			status = FLASH_ProgramDoubleWord((uint32_t)ffsys.mru, (uint64_t)data);
 		}
 
 		if (status == FLASH_BUSY)
@@ -345,7 +346,7 @@ int flashfile_writeMru(mru_t data)
 		else if (status != FLASH_COMPLETE)
 		{
 			retry++; busyRetry = 0;
-			dbg_printf(DBGMODE_ERR, "Error flashfile_writeMru unable to write MRU at address 0x%08X data 0x%08X, status = 0x%08X on attempt %d\r\n", (uint32_t)flashfilesystem.mru, data, status, retry);
+			dbg_printf(DBGMODE_ERR, "Error flashfile_writeMru unable to write MRU at address 0x%08X data 0x%08X, status = 0x%08X on attempt %d\r\n", (uint32_t)ffsys.mru, data, status, retry);
 		}
 	}
 	while (retry < FLASHFILE_RETRY_MAX && busyRetry < FLASHFILE_BUSY_MAX && status != FLASH_COMPLETE);
@@ -378,17 +379,18 @@ int flashfile_writeNvmFile(nvm_file_t* data)
 	// find the next available space, must be blank
 	uint32_t found = 0;
 
-	if ((int)flashfilesystem.mru >= (FLASHFILE_PAGE_START + sizeof(nvm_file_t)) && (int)flashfilesystem.mru <= FLASHFILE_PAGE_END)
+	if ((int)ffsys.mru >= (FLASHFILE_PAGE_START + sizeof(nvm_file_t)) && (int)ffsys.mru <= FLASHFILE_PAGE_END)
 	{
-		old_mru = *flashfilesystem.mru;
+		old_mru = *ffsys.mru;
+		dbg_printf(DBGMODE_DEBUG, "ffsys.mru originally found at 0x%08X, value 0x%08X\r\n", ffsys.mru, old_mru);
 
-		for (uint32_t i = (int)flashfilesystem.mru; i < FLASHFILE_PAGE_END - sizeof(nvm_file_t) - sizeof(mru_t); i++)
+		for (uint32_t i = (int)ffsys.mru + (int)sizeof(mru_t); i < FLASHFILE_PAGE_END - sizeof(nvm_file_t) - sizeof(mru_t); i += sizeof(mru_t))
 		{
 			// check if memory region required is blank
 			char isBlank = 1;
 			for (uint32_t j = 0; j < sizeof(nvm_file_t) + sizeof(mru_t); j++)
 			{
-				uint8_t* p = (uint8_t*)j;
+				uint8_t* p = (uint8_t*)(i + j);
 				if ((*p) != 0xFF) {
 					isBlank = 0;
 					break;
@@ -402,6 +404,10 @@ int flashfile_writeNvmFile(nvm_file_t* data)
 				break;
 			}
 		}
+	}
+	else
+	{
+		dbg_printf(DBGMODE_DEBUG, "ffsys.mru not found in range, 0x%08X\r\n", ffsys.mru);
 	}
 
 	FLASH_Unlock();
@@ -441,8 +447,22 @@ int flashfile_writeNvmFile(nvm_file_t* data)
 	else
 	{
 		// we destroy the magic word of the previous file to make it invalid
-		dbg_printf(DBGMODE_DEBUG, "flashfile_writeNvmFile destroying old NVM at addr 0x%08X\r\n", (uint32_t)flashfilesystem.nvm_file);
-		FLASH_ProgramWord((uint32_t)flashfilesystem.nvm_file, 0);
+		dbg_printf(DBGMODE_DEBUG, "flashfile_writeNvmFile destroying old NVM at addr 0x%08X\r\n", (uint32_t)ffsys.nvm_file);
+		retry = busyRetry = 0;
+		do
+		{
+			status = FLASH_ProgramWord((uint32_t)ffsys.nvm_file, 0);
+			if (status == FLASH_BUSY)
+			{
+				busyRetry++;
+			}
+			else if (status != FLASH_COMPLETE)
+			{
+				retry++; busyRetry = 0;
+				dbg_printf(DBGMODE_ERR, "Error flashfile_writeNvmFile unable to destroy magic at address 0x%08X, status = 0x%08X on attempt %d\r\n", (uint32_t)ffsys.nvm_file, status, retry);
+			}
+		}
+		while (retry < FLASHFILE_RETRY_MAX && busyRetry < FLASHFILE_BUSY_MAX && status != FLASH_COMPLETE);
 	}
 
 	p = (uint8_t*)data;
@@ -472,23 +492,24 @@ int flashfile_writeNvmFile(nvm_file_t* data)
 		}
 	}
 
-	flashfilesystem.nvm_file = (nvm_file_t*)found;
-	flashfilesystem.mru = (mru_t*)(((void*)flashfilesystem.nvm_file) + sizeof(nvm_file_t)); // MRU should be placed immediately after the nvm file
+	ffsys.nvm_file = (nvm_file_t*)found;
+	ffsys.mru = (mru_t*)(((void*)ffsys.nvm_file) + sizeof(nvm_file_t)); // MRU should be placed immediately after the nvm file
 
 	retry = busyRetry = 0;
+	status = FLASH_BUSY;
 	do
 	{
 		if (sizeof(mru_t) == sizeof(uint8_t)) {
-			status = FLASH_ProgramByte((uint32_t)flashfilesystem.mru, (uint8_t)old_mru);
+			status = FLASH_ProgramByte((uint32_t)ffsys.mru, (uint8_t)old_mru);
 		}
 		else if (sizeof(mru_t) == sizeof(uint16_t)) {
-			status = FLASH_ProgramHalfWord((uint32_t)flashfilesystem.mru, (uint16_t)old_mru);
+			status = FLASH_ProgramHalfWord((uint32_t)ffsys.mru, (uint16_t)old_mru);
 		}
 		else if (sizeof(mru_t) == sizeof(uint32_t)) {
-			status = FLASH_ProgramWord((uint32_t)flashfilesystem.mru, (uint32_t)old_mru);
+			status = FLASH_ProgramWord((uint32_t)ffsys.mru, (uint32_t)old_mru);
 		}
 		else if (sizeof(mru_t) == sizeof(uint64_t)) {
-			status = FLASH_ProgramDoubleWord((uint32_t)flashfilesystem.mru, (uint64_t)old_mru);
+			status = FLASH_ProgramDoubleWord((uint32_t)ffsys.mru, (uint64_t)old_mru);
 		}
 
 		if (status == FLASH_BUSY)
@@ -498,7 +519,7 @@ int flashfile_writeNvmFile(nvm_file_t* data)
 		else if (status != FLASH_COMPLETE)
 		{
 			retry++;
-			dbg_printf(DBGMODE_ERR, "Error flashfile_writeNvmFile unable to write MRU at address 0x%08X data 0x%08X, status = 0x%08X on attempt %d\r\n", (uint32_t)flashfilesystem.mru, old_mru, status, retry);
+			dbg_printf(DBGMODE_ERR, "Error flashfile_writeNvmFile unable to write MRU at address 0x%08X data 0x%08X, status = 0x%08X on attempt %d\r\n", (uint32_t)ffsys.mru, old_mru, status, retry);
 		}
 	}
 	while (retry < FLASHFILE_RETRY_MAX && busyRetry < FLASHFILE_BUSY_MAX && status != FLASH_COMPLETE);
@@ -517,7 +538,7 @@ int flashfile_writeNvmFile(nvm_file_t* data)
 
 int flashfile_writeDefaultNvmFile()
 {
-	nvm_file_t* data = (nvm_file_t*)flashfilesystem.cache;
+	nvm_file_t* data = (nvm_file_t*)ffsys.cache;
 
 	// ignore magic and crc, these are written later inside flashfile_writeNvmFile
 
@@ -526,4 +547,16 @@ int flashfile_writeDefaultNvmFile()
 	int status = flashfile_writeNvmFile(data);
 
 	return status;
+}
+
+void flashfile_updateEntry(void* dest, void* src, uint8_t len, char now)
+{
+	if (memcmp(dest, src, len) == 0)
+		return;
+
+	uint32_t offset = (uint32_t)dest - (uint32_t)ffsys.nvm_file;
+	uint8_t* cache = (uint8_t*)ffsys.cache; // 32 bit to 8 bit conversion
+	memcpy(&cache[offset], src, len);
+	ffsys.cache_dirty = 1;
+	if (now) flashfile_cacheFlush();
 }

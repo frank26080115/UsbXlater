@@ -8,5 +8,6 @@
 void swo_init();
 void swo_deinit();
 void swo_printf(char * format, ...);
+void swo_wait();
 
 #endif /* SWO_H_ */

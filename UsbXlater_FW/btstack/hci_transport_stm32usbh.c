@@ -92,8 +92,10 @@ static int stm32usbh_send_packet(uint8_t packet_type, uint8_t *packet, int size)
 
 static void   stm32usbh_deliver_packet(void){
 	if (read_pos < 3) return; // sanity check
-	hci_dump_packet( hci_packet[0], 1, &hci_packet[1], read_pos-1);
-	packet_handler(hci_packet[0], &hci_packet[1], read_pos-1);
+	int len = read_pos - 1;
+	hci_dump_packet( hci_packet[0], 1, &hci_packet[1], len);
+
+	packet_handler(hci_packet[0], &hci_packet[1], len);
 
 	stm32usbh_state = STM32USBH_PACKET_TYPE;
 	read_pos = 0;
@@ -174,7 +176,7 @@ void stm32usbh_handle_raw(uint8_t packet_type, uint8_t* data, int sz)
 			read_now--;
 		}
 
-		if (bytes_to_read <= 0) {
+		if (bytes_to_read == 0) {
 			stm32usbh_statemachine();
 		}
 	}
@@ -183,6 +185,7 @@ void stm32usbh_handle_raw(uint8_t packet_type, uint8_t* data, int sz)
 static int stm32usbh_can_send_packet_now(uint8_t packet_type)
 {
 	if (BT_USBH_CORE == 0 || BT_USBH_DEV == 0) {
+		dbg_printf(DBGMODE_ERR, "stm32usbh_can_send_packet_now, no USB device\r\n");
 		return 0;
 	}
 	if (stm32usbh_state != STM32USBH_PACKET_TYPE || read_pos != 0) {

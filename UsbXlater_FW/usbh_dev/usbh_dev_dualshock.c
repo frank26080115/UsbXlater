@@ -41,6 +41,9 @@ void USBH_DS4_Init_Handler(USB_OTG_CORE_HANDLE* pcore, USBH_DEV* pdev)
 			EMUSTATE_GIVEN_DS4_1402 |
 		0 );
 	DS4EMU_State |= EMUSTATE_IS_DS4_USB_CONNECTED;
+
+	flashfile_updateEntry(&ffsys.nvm_file->d.fmt.ds4_vid, &(pdev->device_prop.Dev_Desc.idVendor), sizeof(uint16_t), 0);
+	flashfile_updateEntry(&ffsys.nvm_file->d.fmt.ds4_pid, &(pdev->device_prop.Dev_Desc.idProduct), sizeof(uint16_t), 1);
 }
 
 void USBH_DS4_Task(USB_OTG_CORE_HANDLE* pcore, USBH_DEV* pdev)
@@ -48,9 +51,9 @@ void USBH_DS4_Task(USB_OTG_CORE_HANDLE* pcore, USBH_DEV* pdev)
 	HID_Data_t* HID_Data = pdev->Usr_Data;
 	USBH_Status status;
 	int len;
-	USBH_Dev_AllocControl(pcore, pdev);
 	if ((DS4EMU_State & EMUSTATE_HAS_DS4_BDADDR) == 0)
 	{
+		USBH_Dev_AllocControl(pcore, pdev);
 		len = 3 * 5;
 		if(status = USBH_Get_Report(pcore, pdev, 0, 0x03, 0x12, len + 1, USBH_DS_Buffer) == USBH_OK)
 		{
@@ -58,33 +61,39 @@ void USBH_DS4_Task(USB_OTG_CORE_HANDLE* pcore, USBH_DEV* pdev)
 			memcpy(ds4_bdaddr, &USBH_DS_Buffer[1], BD_ADDR_LEN);
 			dbg_printf(DBGMODE_DEBUG, "DS4 %s xfer BDADDR ", USBH_Dev_DebugPrint(pdev, 0));
 			dbg_printf(DBGMODE_DEBUG, "%s\r\n", print_bdaddr(ds4_bdaddr));
+			flashfile_updateEntry(ffsys.nvm_file->d.fmt.ds4_bdaddr, ds4_bdaddr, BD_ADDR_LEN, 1);
 		}
 		return;
 	}
 	if ((DS4EMU_State & EMUSTATE_HAS_MFG_DATE) == 0)
 	{
-		len = DS4_MFG_DATE_LEN;
+		USBH_Dev_AllocControl(pcore, pdev);
+		len = DS4_REPORT_A3_LEN;
 		if(status = USBH_Get_Report(pcore, pdev, 0, 0x03, 0xA3, len + 1, USBH_DS_Buffer) == USBH_OK)
 		{
 			DS4EMU_State |= EMUSTATE_HAS_MFG_DATE;
-			memcpy(ds4_mfg_date, &USBH_DS_Buffer[1], len);
+			memcpy(ds4_reportA3, &USBH_DS_Buffer[1], len);
 			dbg_printf(DBGMODE_DEBUG, "DS4 %s xfer MFG date\r\n", USBH_Dev_DebugPrint(pdev, 0));
+			flashfile_updateEntry(ffsys.nvm_file->d.fmt.report_A3, ds4_reportA3, len, 1);
 		}
 		return;
 	}
 	if ((DS4EMU_State & EMUSTATE_HAS_REPORT_02) == 0)
 	{
+		USBH_Dev_AllocControl(pcore, pdev);
 		len = DS4_REPORT_02_LEN - 1;
 		if(status = USBH_Get_Report(pcore, pdev, 0, 0x03, 0x02, len + 1, USBH_DS_Buffer) == USBH_OK)
 		{
 			DS4EMU_State |= EMUSTATE_HAS_REPORT_02;
 			memcpy(ds4_report02, &USBH_DS_Buffer[1], len);
 			dbg_printf(DBGMODE_DEBUG, "DS4 %s xfer report 0x02\r\n", USBH_Dev_DebugPrint(pdev, 0));
+			flashfile_updateEntry(ffsys.nvm_file->d.fmt.report_02, ds4_report02, len, 1);
 		}
 		return;
 	}
 	if ((DS4EMU_State & EMUSTATE_GIVEN_PS4_BDADDR) == 0 && (DS4EMU_State & EMUSTATE_HAS_BT_BDADDR) != 0)
 	{
+		USBH_Dev_AllocControl(pcore, pdev);
 		len = BD_ADDR_LEN + LINK_KEY_LEN;
 		USBH_DS_Buffer[0] = 0x13;
 		memcpy(&USBH_DS_Buffer[1], hci_local_bd_addr(), BD_ADDR_LEN);
@@ -98,6 +107,7 @@ void USBH_DS4_Task(USB_OTG_CORE_HANDLE* pcore, USBH_DEV* pdev)
 	}
 	if ((DS4EMU_State & EMUSTATE_GIVEN_PS4_BDADDR) != 0 && (DS4EMU_State & EMUSTATE_HAS_BT_BDADDR) != 0 && (DS4EMU_State & EMUSTATE_GIVEN_DS4_1401) == 0)
 	{
+		USBH_Dev_AllocControl(pcore, pdev);
 		len = 16;
 		memset(USBH_DS_Buffer, 0, len + 1);
 		USBH_DS_Buffer[0] = 0x14;
@@ -111,6 +121,7 @@ void USBH_DS4_Task(USB_OTG_CORE_HANDLE* pcore, USBH_DEV* pdev)
 	}
 	if ((DS4EMU_State & EMUSTATE_GIVEN_PS4_BDADDR) != 0 && (DS4EMU_State & EMUSTATE_HAS_BT_BDADDR) != 0 && (DS4EMU_State & EMUSTATE_GIVEN_DS4_1401) != 0 && (DS4EMU_State & EMUSTATE_GIVEN_DS4_1402) == 0 && (DS4EMU_State & EMUSTATE_IS_DS4_BT_CONNECTED) == 0)
 	{
+		USBH_Dev_AllocControl(pcore, pdev);
 		len = 16;
 		USBH_DS_Buffer[0] = 0x14;
 		USBH_DS_Buffer[1] = 0x02;

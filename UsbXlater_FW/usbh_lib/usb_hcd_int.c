@@ -742,9 +742,8 @@ USB_OTG_ISR_Statistics.hcin_xfercompl[num]++;
     pcore->host.ErrCnt [num]= 0;
     CLEAR_HC_INT(hcreg , xfercompl);
 
-    if ((hcchar.b.eptype == EP_TYPE_CTRL)
-    //|| (hcchar.b.eptype == EP_TYPE_BULK)
-       )
+    if ((hcchar.b.eptype == EP_TYPE_CTRL)||
+        (hcchar.b.eptype == EP_TYPE_BULK))
     {
       UNMASK_HOST_INT_CHH (num);
       USB_OTG_HC_Halt(pcore, num);
@@ -758,7 +757,6 @@ USB_OTG_ISR_Statistics.hcin_xfercompl[num]++;
       USB_OTG_WRITE_REG32(&pcore->regs.HC_REGS[num]->HCCHAR, hcchar.d32);
       pcore->host.URB_State[num] = URB_DONE;
     }
-
   }
   else if (hcint.b.chhltd)
   {
@@ -784,14 +782,10 @@ USB_OTG_ISR_Statistics.hcin_chhltd[num]++;
       pcore->host.URB_State[num] = URB_ERROR;
 
     }
-    else
+    else // NAK
     {
-      if (pcore->host.HC_Status[num] == HC_NAK)
-      {
+      if(hcchar.b.eptype == EP_TYPE_INTR) {
         pcore->host.URB_State[num] = URB_NOTREADY;
-      }
-      if(hcchar.b.eptype == EP_TYPE_INTR)
-      {
         pcore->host.hc[num].toggle_in ^= 1;
       }
     }
@@ -816,13 +810,15 @@ USB_OTG_ISR_Statistics.hcin_xacterr[num]++;
 #ifdef ENABLE_USBOTG_STATISTICS
 USB_OTG_ISR_Statistics.hcin_nak[num]++;
 #endif
-    if(hcchar.b.eptype == EP_TYPE_INTR)
+    if(hcchar.b.eptype == EP_TYPE_INTR
+    //|| hcchar.b.eptype == EP_TYPE_BULK
+    )
     {
       UNMASK_HOST_INT_CHH (num);
       USB_OTG_HC_Halt(pcore, num);
     }
     else if  ((hcchar.b.eptype == EP_TYPE_CTRL)
-           || (hcchar.b.eptype == EP_TYPE_BULK)
+             //|| (hcchar.b.eptype == EP_TYPE_BULK)
               )
     {
       /* re-activate the channel  */
@@ -830,10 +826,12 @@ USB_OTG_ISR_Statistics.hcin_nak[num]++;
       hcchar.b.chdis = 0;
       USB_OTG_WRITE_REG32(&pcore->regs.HC_REGS[num]->HCCHAR, hcchar.d32);
     }
-    pcore->host.HC_Status[num] = HC_NAK;
-    if (hcchar.b.eptype == EP_TYPE_BULK && pcore->host.URB_State[num] == URB_IDLE) {
-      pcore->host.URB_State[num] = URB_NOTREADY;
+    else if (hcchar.b.eptype == EP_TYPE_BULK) {
+      if (pcore->host.URB_State[num] == URB_IDLE) {
+        pcore->host.URB_State[num] = URB_NOTREADY;
+      }
     }
+    pcore->host.HC_Status[num] = HC_NAK;
     CLEAR_HC_INT(hcreg , nak);
   }
 

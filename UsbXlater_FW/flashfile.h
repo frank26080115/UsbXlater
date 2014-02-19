@@ -1,6 +1,8 @@
 #ifndef FLASHFILE_H_
 #define FLASHFILE_H_
 
+#include <btstack/utils.h>
+
 /*
 
 nvm means non-volatile memory
@@ -26,7 +28,7 @@ user config such as key bindings and such are handled by another flash sector in
 
 */
 
-typedef uint8_t mru_t;
+typedef uint32_t mru_t;
 
 typedef struct
 {
@@ -34,12 +36,13 @@ typedef struct
 	union {
 		uint32_t raw[64];
 		struct {
-			uint8_t dongle_bdaddr[6];
-			uint8_t report_a3[8 * 6];
-			uint8_t report_12[3 * 5]; // the first 6 bytes is the DS4 BD_ADDR
-			uint8_t report_13[6 + 8 + 8]; // the first 6 bytes is the PS4 BD_ADDR
+			uint8_t report_A3[8 * 6];
 			uint8_t report_02[36];
-			uint8_t link_key[16];
+			uint16_t ds4_vid;
+			uint16_t ds4_pid;
+			uint8_t ds4_bdaddr[BD_ADDR_LEN];
+			uint8_t ps4_bdaddr[BD_ADDR_LEN];
+			uint8_t ps4_link_key[LINK_KEY_LEN];
 		} fmt;
 	} d;
 	uint32_t crc;
@@ -50,7 +53,7 @@ typedef struct
 {
 	nvm_file_t* nvm_file;
 	mru_t* mru;
-	uint32_t cache[64 + 2];
+	uint32_t cache[64 + 4];
 	char cache_dirty;
 }
 flashfilesystem_t;
@@ -64,7 +67,7 @@ flashfilesystem_t;
 #define FLASHFILE_RETRY_MAX 8
 #define FLASHFILE_BUSY_MAX 256
 
-extern flashfilesystem_t flashfilesystem;
+extern flashfilesystem_t ffsys;
 
 int flashfile_init();
 void flashfile_sectorDump();
@@ -74,5 +77,6 @@ mru_t* flashfile_findMru();
 int flashfile_writeMru(mru_t data);
 int flashfile_writeNvmFile(nvm_file_t* data);
 int flashfile_writeDefaultNvmFile();
+void flashfile_updateEntry(void* dest, void* src, uint8_t len, char now);
 
 #endif

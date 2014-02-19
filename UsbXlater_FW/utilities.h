@@ -26,11 +26,15 @@
 #define DBGMODE_INFO 0x20
 extern uint8_t dbgmode;
 #define dbg_printf(m, fmt, args...)    do { if ((m & dbgmode) == 0) { break; } if ((dbgmode & DBGMODE_CER) != 0) { cereal_printf(fmt, ##args); } if ((dbgmode & DBGMODE_SWO) != 0) { swo_printf(fmt, ##args); } } while (0)
-#define dbg_trace()                    do { dbg_printf(DBGMODE_SWO | DBGMODE_TRACE, "\r\ntrace: " __FILE__ " : %d\r\n", __LINE__ ); } while (0)
-#define dbg_trace_exit()               do { dbg_printf(DBGMODE_SWO | DBGMODE_TRACE, "\r\ntrace: " __FILE__ " : %d (exit)\r\n", __LINE__ ); } while (0)
+#define dbg_trace()                    do { dbg_printf(DBGMODE_SWO | DBGMODE_TRACE, "\r\ntrace: " __FILE__ ":%d, t:%d, freeRam:%d, stackDepth:%d\r\n", __LINE__ , systick_1ms_cnt, freeRam(), current_stack_depth()); } while (0)
+#define dbg_printf_if(c, fmt, args...) if (c) dbg_printf(DBGMODE_DEBUG, fmt, ##args)
+#define dbg_trace_if(c) if ((c)) dbg_trace()
 
 #define GLOBAL_TEMP_BUFF_SIZE 128
 extern uint8_t global_temp_buff[GLOBAL_TEMP_BUFF_SIZE];
+extern volatile uint32_t dbg_cnt;
+extern volatile void* dbg_obj;
+extern volatile size_t stack_at_main;
 
 #define DELAY_LOOPS(x) do { uint32_t _____i = (x); while (--_____i) { asm volatile ("nop"); } } while (0)
 
@@ -53,10 +57,12 @@ static inline void delay_us(const uint32_t x)
 
 void jump_to_bootloader(void);
 uint16_t fletcher16(uint8_t const * data, size_t bytes);
+char* version_string();
 uint32_t version_crc();
 uint8_t* print_bdaddr(uint8_t*);
 uint8_t* print_linkkey(uint8_t*);
 int freeRam();
+int current_stack_depth();
 
 extern volatile uint32_t systick_1ms_cnt;
 extern volatile uint32_t delay_1ms_cnt;

@@ -53,7 +53,7 @@ typedef enum {
 } sdp_client_state_t;
 
 
-void sdp_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size);
+void sdp_client_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size);
 
 static uint16_t setup_service_search_attribute_request(uint8_t * data);
 
@@ -102,7 +102,7 @@ void sdp_client_query(bd_addr_t remote, uint8_t * des_serviceSearchPattern, uint
     PDU_ID = SDP_ServiceSearchAttributeResponse;
 
     sdp_client_state = W4_CONNECT;
-    l2cap_create_channel_internal(NULL, sdp_packet_handler, remote, PSM_SDP, l2cap_max_mtu());
+    l2cap_create_channel_internal(NULL, sdp_client_packet_handler, remote, PSM_SDP, l2cap_max_mtu());
 }
 
 
@@ -181,7 +181,7 @@ static void parse_service_search_attribute_response(uint8_t* packet){
     }
 }
 
-void sdp_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size){
+void sdp_client_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size){
     uint16_t handle;
 
     if (packet_type == L2CAP_DATA_PACKET){
@@ -463,7 +463,7 @@ void sdp_client_service_attribute_search(bd_addr_t remote, uint32_t search_servi
     PDU_ID = SDP_ServiceAttributeResponse;
 
     sdp_client_state = W4_CONNECT;
-    l2cap_create_channel_internal(NULL, sdp_packet_handler, remote, PSM_SDP, l2cap_max_mtu());
+    l2cap_create_channel_internal(NULL, sdp_client_packet_handler, remote, PSM_SDP, l2cap_max_mtu());
 }
 
 void sdp_client_service_search(bd_addr_t remote, uint8_t * des_serviceSearchPattern){
@@ -472,7 +472,7 @@ void sdp_client_service_search(bd_addr_t remote, uint8_t * des_serviceSearchPatt
     PDU_ID = SDP_ServiceSearchResponse;
 
     sdp_client_state = W4_CONNECT;
-    l2cap_create_channel_internal(NULL, sdp_packet_handler, remote, PSM_SDP, l2cap_max_mtu());
+    l2cap_create_channel_internal(NULL, sdp_client_packet_handler, remote, PSM_SDP, l2cap_max_mtu());
 }
 #endif
 

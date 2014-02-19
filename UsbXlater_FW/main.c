@@ -59,26 +59,16 @@ int main(void)
 				;
 
 	//cereal_printf("\r\n\r\nhello world\r\n");
-	swo_printf("\r\n\r\nUsbXlater, UID %08X\r\n", DBGMCU->IDCODE);
-	swo_printf("Compiled on " __DATE__ ", " __TIME__", ");
-	#ifdef __GNUC__
-	swo_printf("GNU C %d", __GNUC__);
-	#ifdef __GNUC_MINOR__
-	swo_printf(".%d", __GNUC_MINOR__);
-	#ifdef __GNUC_PATCHLEVEL__
-	swo_printf(".%d", __GNUC_PATCHLEVEL__);
-	#endif
-	#endif
-	swo_printf("\r\n");
-	#else
-	swo_printf("unknown compiler\r\n");
-	#endif
-	#ifndef __FUNCTION__
-	#define __FUNCTION__
-	#endif
-	swo_printf("Free RAM: %d\r\n", freeRam());
 
 	crc_init();
+
+	swo_printf("\r\n\r\n%s\r\n", version_string());
+	swo_printf("version CRC 0x%08X\r\n", version_crc());
+	swo_printf("MCU-ID %08X\r\n", DBGMCU->IDCODE);
+	swo_printf("Free RAM: %d\r\n", freeRam());
+
+	volatile int obj = 123;
+	stack_at_main = (size_t)&obj;
 
 	/*
 	// TODO, this is a simplified loop without fancy functionality, remove when testing is done
@@ -89,8 +79,8 @@ int main(void)
 	}
 	//*/
 
-	//flashfile_init();
-	//flashfile_sectorDump();
+	flashfile_init();
+	flashfile_sectorDump();
 
 	led_1_on(); delay_ms(150); led_1_off();
 	led_2_on(); delay_ms(150); led_2_off();
@@ -130,113 +120,12 @@ int main(void)
 	USBH_Dev_HID_Cnt = 0;
 	USBD_CDC_IsReady = 0;
 
-	enum host_intf_state_ {
-		HISTATE_NONE,
-		HISTATE_READY,
-		HISTATE_PASSTHROUGH,
-	} host_intf_state;
-
-	enum dev_intf_state_ {
-		DISTATE_NONE,
-		DISTATE_CONNECTED,
-		DISTATE_CTRLER_PS3,
-		DISTATE_CTRLER_PS4,
-		DISTATE_VCP,
-		DISTATE_PASSTHROUGH,
-	} dev_intf_state;
-
-	host_intf_state = HISTATE_NONE;
-	dev_intf_state = DISTATE_NONE;
-
 	// TODO, this is a simplified loop without fancy functionality, remove when testing is done
 	while (1)
 	{
 		dbgwdg_feed();
 
 		USBH_Process(&USB_OTG_Core_host, &USBH_Dev);
-	}
-
-	while (1)
-	{
-		dbgwdg_feed();
-
-		USBH_Process(&USB_OTG_Core_host, &USBH_Dev);
-
-		if (host_intf_state == HISTATE_NONE && USBH_Dev.gState == HOST_DO_TASK) {
-			host_intf_state = HISTATE_READY;
-		}
-
-		if (dev_intf_state == DISTATE_NONE && USB_OTG_Core_dev.dev.device_status == USB_OTG_CONFIGURED) {
-			dev_intf_state = DISTATE_CONNECTED;
-		}
-
-		if (dev_intf_state == DISTATE_CONNECTED && USBD_Host_Is_PS3 != 0) {
-			dbg_printf(DBGMODE_TRACE, "Entering PS3 CTRLER Mode\r\n");
-			dev_intf_state = DISTATE_CTRLER_PS3;
-		}
-
-		if (dev_intf_state == DISTATE_CONNECTED && USBD_Host_Is_PS4 != 0) {
-			dbg_printf(DBGMODE_TRACE, "Entering PS4 CTRLER Mode\r\n");
-			dev_intf_state = DISTATE_CTRLER_PS4;
-		}
-
-		if (systick_1ms_cnt > 999000 && USBD_Host_Is_PS3 == 0 && USBD_Host_Is_PS4 == 0 && (dev_intf_state != DISTATE_VCP && dev_intf_state != DISTATE_PASSTHROUGH))
-		{
-			dev_intf_state = DISTATE_VCP;
-
-			// force a disconnection
-			DCD_DevDisconnect(&USB_OTG_Core_dev);
-
-			// setup new handler callbacks
-			USBD_DeInit(&USB_OTG_Core_dev);
-			USBD_Init(&USB_OTG_Core_dev, USB_OTG_HS_CORE_ID, &USBD_Dev_CDC_cb);
-			DCD_DevDisconnect(&USB_OTG_Core_dev);
-
-			// disconnection delay, super long because Windows might not re-enumerate if it is too short
-			uint32_t t = systick_1ms_cnt;
-			while ((systick_1ms_cnt - t) < 200) ;
-
-			// force a reconnection to reenumerate as CDC
-			DCD_DevConnect(&USB_OTG_Core_dev);
-
-			dbg_printf(DBGMODE_TRACE, "Entering VCP Mode\r\n");
-		}
-
-		uint8_t ret = cmdHandler();
-		if (ret == 1) {
-			run_passthrough();
-		}
-		else if (ret == 2) {
-			run_bootload();
-		}
-		else if (ret == 3) {
-			NVIC_SystemReset();
-		}
-
-		if (host_intf_state == HISTATE_NONE && dev_intf_state == DISTATE_NONE && systick_1ms_cnt > 5000)
-		{
-			// we'll assume the user wants to go into the raw bootloader if nothing is happening
-			// the device interface is the power source, so this is extremely rare in
-			// normal usage situations
-			run_bootload();
-		}
-
-		kbm2c_task(0);
-
-		if (host_intf_state == HISTATE_READY && (dev_intf_state == DISTATE_CTRLER_PS3 || dev_intf_state == DISTATE_CTRLER_PS4)) {
-			// this is the main operating mode
-			// we go to a tighter loop for better performance
-			dbg_printf(DBGMODE_TRACE, "Entering High Performance Controller Mode Loop \r\n");
-			break;
-		}
-	}
-
-	// this loop is much tighter
-	while (1)
-	{
-		dbgwdg_feed();
-		USBH_Process(&USB_OTG_Core_host, &USBH_Dev);
-		kbm2c_task(0);
 	}
 
 	return 0;
@@ -250,6 +139,7 @@ void SysTick_Handler(void)
 
 	systick_1ms_cnt++;
 
+	//if ((systick_1ms_cnt % 2000) == 0 && dbg_obj != 0) dbg_printf(DBGMODE_DEBUG, "sth %d %d\r\n", systick_1ms_cnt, ((USBH_DevIO_t*)dbg_obj)->state);
 	//if (hal_tick_handler != 0) hal_tick_handler();
 }
 

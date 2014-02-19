@@ -6,8 +6,11 @@
 #include <btstack/src/l2cap.h>
 #include <btstack/src/hci.h>
 
-#define DS4_MFG_DATE_LEN (8*6)
+#define DS4_REPORT_A3_LEN (8*6)
 #define DS4_REPORT_02_LEN 37
+
+#define DS4_SDP_SERVICE_SEARCH_ATTRIBUTE_RESPONSE_SIZE 697
+#define PS4_SDP_SERVICE_SEARCH_ATTRIBUTE_RESPONSE_SIZE 333
 
 typedef enum {
 	EMUSTATE_NONE = 0,
@@ -32,6 +35,7 @@ typedef enum
 	EMUUSBDMODE_DS3,
 	EMUUSBDMODE_KBM,
 	EMUUSBDMODE_VCP,
+	EMUUSBDMODE_BOOTLOADER,
 }
 EMU_USBD_Mode_t;
 
@@ -55,8 +59,11 @@ extern const uint8_t ds4_link_key[];
 extern const uint8_t ds4_bt_device_name[];
 
 extern volatile EMU_State_t DS4EMU_State;
+extern volatile USBD_Host_t EMU_USBD_Host;
 extern uint8_t ds4_bdaddr[BD_ADDR_LEN];
-extern uint8_t ds4_mfg_date[DS4_MFG_DATE_LEN];
+extern uint8_t ps4_bdaddr[BD_ADDR_LEN];
+extern uint8_t ds4_reportA3[DS4_REPORT_A3_LEN];
 extern uint8_t ds4_report02[DS4_REPORT_02_LEN];
+extern uint8_t ps4_link_key[LINK_KEY_LEN];
 
 #endif

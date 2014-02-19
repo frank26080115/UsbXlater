@@ -3,6 +3,7 @@
 #include <stm32fx/misc.h>
 #include <stm32fx/peripherals.h>
 #include <cmsis/core_cmx.h>
+#include <cmsis/core_cmInstr.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -70,4 +71,11 @@ void swo_printf(char * format, ...)
 		uint8_t ch = global_temp_buff[i];
 		swo_sendchar(ch);
 	}
+}
+
+void swo_wait() {
+	volatile uint32_t i = 0xFFFFF; // implement a timeout
+	while (i--) __NOP();
+	i = 0xFFF;
+	while (ITM->PORT[0].u32 == 0 && i--); // wait for next
 }

@@ -138,3 +138,16 @@ char* USBH_Dev_DebugPrint(USBH_DEV *pdev, USBH_EpDesc_TypeDef* ep)
 	}
 	return &global_temp_buff[GLOBAL_TEMP_BUFF_SIZE - 32];
 }
+
+void USBH_Dev_DebugFreeChannels(USB_OTG_CORE_HANDLE * pcore)
+{
+	int idx;
+	dbg_printf(DBGMODE_DEBUG, "Free HCs:");
+	for (idx = 0 ; idx < HC_MAX ; idx++)
+	{
+		if ((pcore->host.channel[idx] & HC_USED) == 0) {
+			dbg_printf(DBGMODE_DEBUG, " %d", idx);
+		}
+	}
+	dbg_printf(DBGMODE_DEBUG, "\r\n");
+}

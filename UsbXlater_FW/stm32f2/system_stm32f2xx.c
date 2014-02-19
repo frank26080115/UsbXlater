@@ -147,15 +147,45 @@
                                    This value must be a multiple of 0x200. */
 
 
+#if (HSE_VALUE == 25000000)
+
 /* PLL_VCO = (HSE_VALUE or HSI_VALUE / PLL_M) * PLL_N */
 #define PLL_M      25
-#define PLL_N      250
+#define PLL_N      240
 
 /* SYSCLK = PLL_VCO / PLL_P */
 #define PLL_P      2
 
 /* USB OTG FS, SDIO and RNG Clock =  PLL_VCO / PLLQ */
 #define PLL_Q      5
+
+#elif (HSE_VALUE == 24000000)
+
+/* PLL_VCO = (HSE_VALUE or HSI_VALUE / PLL_M) * PLL_N */
+#define PLL_M      24
+#define PLL_N      240
+
+/* SYSCLK = PLL_VCO / PLL_P */
+#define PLL_P      2
+
+/* USB OTG FS, SDIO and RNG Clock =  PLL_VCO / PLLQ */
+#define PLL_Q      5
+
+#elif (HSE_VALUE == 8000000)
+
+/* PLL_VCO = (HSE_VALUE or HSI_VALUE / PLL_M) * PLL_N */
+#define PLL_M      8
+#define PLL_N      240
+
+/* SYSCLK = PLL_VCO / PLL_P */
+#define PLL_P      2
+
+/* USB OTG FS, SDIO and RNG Clock =  PLL_VCO / PLLQ */
+#define PLL_Q      7
+
+#else
+#error HSE Value not defined
+#endif
 
 /**
   * @}

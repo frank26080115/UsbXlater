@@ -310,16 +310,8 @@ void kbm2c_task(char force)
 		ctrler_data.btnBits |= (1 << CTRLBTN_HOME);
 	}
 
-	if (USBD_Host_Is_PS4 == 0 && USBD_Dev_DS4_IsActive == 0)
-	{
-		kbm2c_prepForDS3();
-		USBD_Dev_DS3_SendReport(&USB_OTG_Core_dev, (uint8_t*)&ds3_packet, sizeof(ds3_packet_t));
-	}
-	else
-	{
-		kbm2c_prepForDS4();
-		USBD_Dev_DS4_SendReport(&USB_OTG_Core_dev, (uint8_t*)&ds4_packet, 4*16);
-	}
+	kbm2c_prepForDS3();
+	USBD_Dev_DS3_SendReport(&USB_OTG_Core_dev, (uint8_t*)&ds3_packet, sizeof(ds3_packet_t));
 
 	memcpy(kbm2c_keyFlagsPrev, kbm2c_keyFlags, KBM2C_KEYFLAGS_SIZE * sizeof(uint32_t));
 }

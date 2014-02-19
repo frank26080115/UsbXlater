@@ -56,9 +56,7 @@ extern "C" {
 #define DAEMON_EVENT_PACKET     0x05
     
 // L2CAP data
-#define L2CAP_DATA_PACKET          0x06
-#define L2CAP_DATA_PACKET_START    (L2CAP_DATA_PACKET | 0x80)
-#define L2CAP_DATA_PACKET_FRAGMENT (L2CAP_DATA_PACKET | 0x40)
+#define L2CAP_DATA_PACKET       0x06
 
 // RFCOMM data
 #define RFCOMM_DATA_PACKET      0x07

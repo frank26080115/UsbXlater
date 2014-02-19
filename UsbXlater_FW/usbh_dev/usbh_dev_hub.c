@@ -164,7 +164,6 @@ void USBH_Dev_Hub_DataHandler(void* p_io, uint8_t* data, uint16_t len)
 					    (wPortStatus & (1 << HUBWPORTSTATUS_ENABLED_BIT)) != 0 &&
 						Hub_Data->children[pn] != 0 && Hub_Data->children[pn]->cb != 0 && (Hub_Data->children[pn]->gState == HOST_DEV_RESET_PENDING || Hub_Data->children[pn]->gState == HOST_IDLE))
 					{
-						dbg_trace();
 						if (((USBH_Device_cb_TypeDef*)Hub_Data->children[pn]->cb)->ResetDevice != 0)
 							((USBH_Device_cb_TypeDef*)Hub_Data->children[pn]->cb)->ResetDevice(pcore, pdev);
 						Hub_Data->children[pn]->device_prop.speed = (wPortStatus & (1 << 9)) ? HPRT0_PRTSPD_LOW_SPEED : HPRT0_PRTSPD_FULL_SPEED; // if bit 9 is 1, then it is low speed (0x02), or else it is full speed (0x01)
@@ -182,7 +181,6 @@ void USBH_Dev_Hub_DataHandler(void* p_io, uint8_t* data, uint16_t len)
 					}
 					else if (Hub_Data->children[pn] == 0)
 					{
-						dbg_trace();
 						errCode = USBH_Dev_Hub_SetPortFeature(pcore, pdev, pn, HUBREQ_PORT_RESET);
 						Hub_Data->children[pn] = calloc(1, sizeof(USBH_DEV));
 						Hub_Data->children[pn]->Parent = pdev;
@@ -240,6 +238,7 @@ void USBH_Dev_Hub_DeInitDev(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 USBH_Status USBH_Dev_Hub_Task(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 {
 	Hub_Data_t* Hub_Data = pdev->Usr_Data;
+	dbg_obj = Hub_Data->intInEpIo;
 	USBH_DevIO_Task(Hub_Data->intInEpIo);
 
 	if (Hub_Data->intInEpIo->state != UIOSTATE_WAIT_DATA)
@@ -249,7 +248,7 @@ USBH_Status USBH_Dev_Hub_Task(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 		{
 			for (int pn = 0; pn < Hub_Data->num_ports; pn++)
 			{
-				if (Hub_Data->children[pn] != 0 && (Hub_Data->port_busy == (pn +1) || Hub_Data->port_busy == 0)) {
+				if (Hub_Data->children[pn] != 0 && (Hub_Data->port_busy == (pn + 1) || Hub_Data->port_busy == 0)) {
 					USBH_Process(pcore, Hub_Data->children[pn]);
 				}
 			}

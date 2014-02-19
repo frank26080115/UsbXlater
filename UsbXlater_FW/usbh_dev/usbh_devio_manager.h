@@ -11,6 +11,7 @@
 //#define ENABLE_EVENODDFRAME_WAIT
 //#define FORCE_DEVIO_ORDERED_TASK
 #define ENABLE_DEVIO_INTR_WAITEVENODDFRAME
+//#define ENABLE_HC_DEBUG
 
 typedef enum
 {
@@ -38,7 +39,7 @@ typedef struct
 	int8_t hc_toggle_out;
 	uint8_t* buff;
 	uint8_t* out_ptr;
-	uint16_t remaining;
+	int16_t remaining;
 	int timeout;
 	int evenodd_frm_cnt;
 	uint8_t retries;

@@ -133,12 +133,16 @@ static void   h4_register_packet_handler(void (*handler)(uint8_t packet_type, ui
 
 static void   h4_deliver_packet(void){
 	if (read_pos < 3) return; // sanity check
-	hci_dump_packet( hci_packet[0], 1, &hci_packet[1], read_pos-1);
-	packet_handler(hci_packet[0], &hci_packet[1], read_pos-1);
+
+	int len = read_pos - 1;
+
+	hci_dump_packet( hci_packet[0], 1, &hci_packet[1], len);
 
 	h4_state = H4_W4_PACKET_TYPE;
 	read_pos = 0;
 	bytes_to_read = 1;
+
+	packet_handler(hci_packet[0], &hci_packet[1], len);
 }
 
 static void h4_statemachine(void){

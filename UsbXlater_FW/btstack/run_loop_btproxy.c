@@ -4,6 +4,9 @@
 #include <btstack/hal_cpu.h>
 
 #include <btstack/src/run_loop_private.h>
+#include <btstack/src/hci.h>
+#include <btstack/src/l2cap.h>
+#include <btstack/btproxy_sdp.h>
 #include <btstack-debug.h>
 
 #include <stddef.h> // NULL
@@ -99,6 +102,8 @@ static void btproxy_runloop_dump_timer(void){
  */
 void btproxy_runloop_execute_once(void) {
     hci_run();
+    l2cap_run();
+    bpsdp_run();
 
     data_source_t *ds;
 
@@ -108,7 +113,7 @@ void btproxy_runloop_execute_once(void) {
         next = (data_source_t *) ds->item.next; // cache pointer to next data_source to allow data source to remove itself
         ds->process(ds);
     }
-    
+
 #ifdef HAVE_TICK
     // process timers
     while (timers) {

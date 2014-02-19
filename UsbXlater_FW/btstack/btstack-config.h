@@ -7,6 +7,7 @@
 
 //#define ENABLE_LOG_INFO
 #define ENABLE_LOG_ERROR
+#define SDP_DES_DUMP
 
 #define HCI_ACL_PAYLOAD_SIZE 1024
 

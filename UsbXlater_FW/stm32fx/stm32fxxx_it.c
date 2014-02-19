@@ -84,6 +84,8 @@ void prvGetRegistersFromStack( uint32_t *pulFaultStackAddress )
 	pc  = pulFaultStackAddress[ 6 ];
 	psr = pulFaultStackAddress[ 7 ];
 
+	swo_wait();
+
 	/* When the following line is hit, the variables contain the register values. */
 	dbg_printf(DBGMODE_ERR, "\r\n Exception Handler, source: %d\r\n", fault_source);
 	dbg_printf(DBGMODE_ERR, "r0: 0x%08X, r1: 0x%08X, r2: 0x%08X, r3: 0x%08X,", r0, r1, r2, r3);

@@ -1,6 +1,5 @@
 #include "btproxy.h"
 #include "stm32fx/peripherals.h"
-#include <ds4_emu.h>
 #include <btstack/btstack.h>
 #include <btstack/hci_transports_btproxy.h>
 #include <btstack/hci_cereal.h>
@@ -13,6 +12,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <btstack/btproxy_sdp.h>
 #include <btstack/sdp_util.h>
 
 hci_transport_t * btproxy_transport;
@@ -84,8 +84,6 @@ void btproxy_init_USB()
 
 void btproxy_init(hci_uart_config_t* ucfg, bt_control_t* btctrlcfg, hci_transport_t* xport)
 {
-	bt_extended_inquiry_response = ds4_extended_inquiry_response;
-
 	btctrlcfg->hw_error = btproxy_hw_error;
 	btctrlcfg->next_cmd = btproxy_init_cmd;
 	btproxy_init_statemachine = 0;
@@ -93,7 +91,7 @@ void btproxy_init(hci_uart_config_t* ucfg, bt_control_t* btctrlcfg, hci_transpor
 	run_loop_init(RUN_LOOP_BTPROXY);
 	hci_init(xport, ucfg, btctrlcfg, &btproxy_db_memory);
 	hci_set_class_of_device(btproxy_provide_class_of_device());
-	hci_set_local_name(btproxy_provide_name_of_device());
+	gap_set_local_name(btproxy_provide_name_of_device());
 	hci_ssp_set_enable(1);
 	hci_ssp_set_io_capability(SSP_IO_CAPABILITY_NO_INPUT_NO_OUTPUT);
 	hci_ssp_set_authentication_requirement(SSP_IO_AUTHREQ_MITM_PROTECTION_NOT_REQUIRED_GENERAL_BONDING);
@@ -147,7 +145,7 @@ void btproxy_packet_handler(void * connection, uint8_t packet_type, uint16_t cha
 				case BTSTACK_EVENT_STATE:
 					// bt stack activated, get started - set local name
 					if (packet[2] == HCI_STATE_WORKING) {
-						sdp_init();
+						bpsdp_init();
 						sdp_register_packet_handler(btproxy_sdp_packet_handler);
 						dbg_printf(DBGMODE_TRACE, "HCI_STATE_WORKING, SDP service registered\r\n");
 						handled = 1;
@@ -156,9 +154,6 @@ void btproxy_packet_handler(void * connection, uint8_t packet_type, uint16_t cha
 						dbg_printf(DBGMODE_TRACE, "BTSTACK_EVENT_STATE HCI_STATE_INITIALIZING\r\n");
 						handled = 1;
 					}
-					break;
-				case BTSTACK_EVENT_NR_CONNECTIONS_CHANGED:
-
 					break;
 				case HCI_EVENT_COMMAND_COMPLETE:
 					num_of_cmds = packet[2];
@@ -227,6 +222,7 @@ void btproxy_packet_handler(void * connection, uint8_t packet_type, uint16_t cha
 					}
 					if (COMMAND_STATUS_EVENT(packet, hci_read_local_version_information)
 						|| COMMAND_STATUS_EVENT(packet, hci_read_remote_supported_features_command)
+						|| COMMAND_STATUS_EVENT(packet, hci_accept_connection_request)
 						//|| COMMAND_STATUS_EVENT(packet, hci_read_remote_supported_features_command)
 						) {
 						handled = 1;
@@ -260,6 +256,10 @@ void btproxy_packet_handler(void * connection, uint8_t packet_type, uint16_t cha
 								packet[9], packet[10], packet[11], packet[12]
 						);
 					break;
+				case BTSTACK_EVENT_NR_CONNECTIONS_CHANGED:
+					dbg_printf(DBGMODE_DEBUG, "BT # of conn %d\r\n", packet[2]);
+					handled = 1;
+					break;
 				case HCI_EVENT_NUMBER_OF_COMPLETED_PACKETS:
 				case GAP_SECURITY_LEVEL:
 				case HCI_EVENT_LINK_SUPERVISION_TIMEOUT_CHANGED:
@@ -267,6 +267,7 @@ void btproxy_packet_handler(void * connection, uint8_t packet_type, uint16_t cha
 				case HCI_EVENT_PAGE_SCAN_REPETITION_MODE_CHANGE:
 				case BTSTACK_EVENT_DISCOVERABLE_ENABLED:
 				case L2CAP_EVENT_SERVICE_REGISTERED:
+				case SDP_SERVICE_REGISTERED:
 					handled = 1;
 					break;
 			}
@@ -460,37 +461,6 @@ int btproxy_baudrate_cmd(void * config, uint32_t baudrate, uint8_t *hci_cmd_buff
 
 void btproxy_hw_error()
 {
-}
-
-void btproxy_db_open() { }
-void btproxy_db_close() { }
-
-int btproxy_db_get_link_key(bd_addr_t *bd_addr, link_key_t *link_key, link_key_type_t * type) {
-	return 0;
-}
-
-void btproxy_db_put_link_key(bd_addr_t *bd_addr, link_key_t *key, link_key_type_t type) {
-
-}
-
-void btproxy_db_delete_link_key(bd_addr_t *bd_addr) {
-
-}
-
-int btproxy_db_get_name(bd_addr_t *bd_addr, device_name_t *device_name) {
-	return 0;
-}
-
-void btproxy_db_put_name(bd_addr_t *bd_addr, device_name_t *device_name) {
-
-}
-
-void btproxy_db_delete_name(bd_addr_t *bd_addr) {
-
-}
-
-uint8_t btproxy_db_persistent_rfcomm_channel(char *servicename) {
-
 }
 
 const remote_device_db_t btproxy_db_memory = {

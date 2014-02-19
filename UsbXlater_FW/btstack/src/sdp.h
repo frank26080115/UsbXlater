@@ -67,7 +67,7 @@ typedef struct {
     
     // data is contained in same memory
     uint32_t        service_record_handle;
-    uint8_t         service_record[1];  // waste 1 byte to allow compilation with older compilers
+    uint8_t*        service_record;
 } service_record_item_t;
 
 

@@ -271,8 +271,8 @@ char USBH_DevIO_Task(USBH_DevIO_t* p_io)
 				}
 				else {
 					ci->state = UIOSTATE_FINALIZE;
+					break;
 				}
-				break;
 			}
 			// fall through
 		case UIOSTATE_SEND_REQUEST:
@@ -290,9 +290,6 @@ char USBH_DevIO_Task(USBH_DevIO_t* p_io)
 					USBH_BulkReceiveData(ci->pcore, ci->buff, epSize, ci->hc);
 				}
 				else if (epType == EP_TYPE_INTR) {
-					#ifdef ENABLE_USBDEVIO_STATISTICS
-					USBH_DevIO_Statistics.intr_req_cnt++;
-					#endif
 					USBH_InterruptReceiveData(ci->pcore, ci->buff, epSize, ci->hc);
 				}
 				else if (epType == EP_TYPE_ISOC) {
@@ -331,19 +328,7 @@ char USBH_DevIO_Task(USBH_DevIO_t* p_io)
 			ci->state = UIOSTATE_WAIT_DATA;
 		case UIOSTATE_WAIT_DATA:
 			urb = HCD_GetURB_State(ci->pcore, ci->hc);
-			if (urb == URB_ERROR)
-			{
-				hcsts = HCD_GetHCState(ci->pcore, ci->hc);
-				ci->hc_has_error = 1;
-				// handle the case when a transaction has data but returns as error
-				if (ci->pcore->host.XferCnt[ci->hc] > 0 && ci->start_toggle != 0 && epDir == USB_D2H) {
-					urb = URB_DONE;
-					#ifdef ENABLE_USBDEVIO_STATISTICS
-					ci->err_cnt++;
-					USBH_DevIO_Statistics.err_cnt++;
-					#endif
-				}
-			}
+			hcsts = HCD_GetHCState(ci->pcore, ci->hc);
 			if (urb != URB_IDLE) {
 				#ifdef ENABLE_USBDEVIO_STATISTICS
 				USBH_DevIO_Statistics.notidle_cnt++;
@@ -448,6 +433,17 @@ char USBH_DevIO_Task(USBH_DevIO_t* p_io)
 					#ifdef ENABLE_USBDEVIO_STATISTICS
 					USBH_DevIO_Statistics.timeout_cnt++;
 					#endif
+
+					if (epType == EP_TYPE_BULK && epDir == USB_H2D && hcsts == HC_XFRC) {
+						// this means that the channel halt interrupt failed somehow
+						// the transfer completed but the URB status never changed
+						// so we set the URB to done, process it on the next loop
+						// and then halt the channel once to reset it
+						ci->state = UIOSTATE_WAIT_DATA;
+						ci->pcore->host.URB_State[ci->hc] = URB_DONE;
+						ci->hc_has_error = 1;
+						break;
+					}
 
 					ci->state = UIOSTATE_FINALIZE;
 
@@ -573,7 +569,8 @@ int8_t USBH_DevIO_OpenChannel(USBH_DevIO_t* ci)
 			ci->ep->bmAttributes & EP_TYPE_MSK,
 			ci->ep->wMaxPacketSize
 		) != HC_OK) {
-			dbg_printf(DBGMODE_ERR, "Failed to open HC for %s\r\n", USBH_Dev_DebugPrint(ci->pdev, ci->ep));
+			dbg_printf(DBGMODE_ERR, "Failed to open HC for %s, ", USBH_Dev_DebugPrint(ci->pdev, ci->ep));
+			USBH_Dev_DebugFreeChannels(ci->pcore);
 			ret = -1;
 		}
 		else {

@@ -308,7 +308,7 @@ typedef struct {
     void             * config;
     
     // bsic configuration
-    char             * local_name;
+    const char         * local_name;
     uint32_t           class_of_device;
     bd_addr_t          local_bd_addr;
     uint8_t            ssp_enable;
@@ -329,6 +329,7 @@ typedef struct {
     uint8_t  num_cmd_packets;
     // uint8_t  total_num_cmd_packets;
     uint8_t  total_num_acl_packets;
+    uint8_t  num_acl_packets_sent;
     uint16_t acl_data_packet_length;
     uint8_t  total_num_le_packets;
     uint16_t le_data_packet_length;
@@ -434,9 +435,6 @@ void hci_init(hci_transport_t *transport, void *config, bt_control_t *control, r
 
 // Set class of device that will be set during Bluetooth init
 void hci_set_class_of_device(uint32_t class_of_device);
-
-// Set the local name that will be set during Bluetooth init
-void hci_set_local_name(char* n);
 
 // Registers a packet handler. Used if L2CAP is not used (rarely). 
 void hci_register_packet_handler(void (*handler)(uint8_t packet_type, uint8_t *packet, uint16_t size));

@@ -16,6 +16,7 @@ int8_t USBH_Dev_AllocControl(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev);
 void USBH_Dev_FreeControl(USB_OTG_CORE_HANDLE *pcore, USBH_DEV *pdev);
 
 char* USBH_Dev_DebugPrint(USBH_DEV *pdev, USBH_EpDesc_TypeDef* ep);
+void USBH_Dev_DebugFreeChannels(USB_OTG_CORE_HANDLE * pcore);
 
 typedef struct {
 	uint16_t vid;

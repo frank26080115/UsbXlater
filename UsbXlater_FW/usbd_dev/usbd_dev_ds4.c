@@ -10,6 +10,7 @@
 #include "usbd_dev_inc_all.h"
 #include <usbh_dev/usbh_dev_dualshock.h>
 #include <flashfile.h>
+#include <ds4_emu.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -31,14 +32,18 @@ const uint8_t USBD_Dev_DS4_DeviceDescriptor[USBD_Dev_DS4_DeviceDescriptor_SIZE] 
 0x00,        // bDeviceSubClass 
 0x00,        // bDeviceProtocol 
 0x40,        // bMaxPacketSize0 64
-0x4C, 0x05,  // idVendor 0x054C
-0xC4, 0x05,  // idProduct 0x05C4
+//0x4C, 0x05,// idVendor 0x054C
+//0xC4, 0x05,// idProduct 0x05C4
+0xFF, 0xFF,  // removed for legal reasons
+0xFF, 0xFF,  // removed for legal reasons
 0x00, 0x01,  // bcdDevice 1.00
 0x01,        // iManufacturer (String Index)
 0x02,        // iProduct (String Index)
 0x00,        // iSerialNumber (String Index)
 0x01,        // bNumConfigurations 1
 };
+
+uint8_t* USBD_Dev_DS4_DeviceDescriptor_Cache;
 
 #define USBD_Dev_DS4_ConfigurationDescriptor_SIZE 41
 const uint8_t USBD_Dev_DS4_ConfigurationDescriptor[USBD_Dev_DS4_ConfigurationDescriptor_SIZE] = {
@@ -330,9 +335,6 @@ const uint8_t USBD_Dev_DS4_HIDDescriptor[USBD_Dev_DS4_HIDDescriptor_SIZE] = {
 };
 
 static uint8_t USBD_HID_Protocol, USBD_HID_IdleState, USBD_HID_AltSet;
-extern uint8_t ds4_rpt_cnt;
-char USBD_Host_Is_PS4 = 0;
-char USBD_Dev_DS4_IsActive = 0;
 
 uint8_t USBD_Dev_DS4_ClassInit(void *pcore , uint8_t cfgidx)
 {
@@ -348,18 +350,14 @@ uint8_t USBD_Dev_DS4_ClassInit(void *pcore , uint8_t cfgidx)
                 USB_OTG_EP_INT);
 	DCD_EP_Flush(pcore, USBD_Dev_DS4_H2D_EP);
 
-	USBD_Host_Is_PS4 = 0;
-	USBD_Dev_DS4_IsActive = 1;
-	ds4_rpt_cnt = 0;
+	USBD_Dev_DS4_DeviceDescriptor_Cache = malloc(USBD_Dev_DS4_DeviceDescriptor_SIZE);
+	memcpy(USBD_Dev_DS4_DeviceDescriptor_Cache, USBD_Dev_DS4_DeviceDescriptor, USBD_Dev_DS4_DeviceDescriptor_SIZE);
 }
 
 uint8_t USBD_Dev_DS4_ClassDeInit(void *pcore , uint8_t cfgidx)
 {
 	DCD_EP_Close (pcore , USBD_Dev_DS4_H2D_EP);
 	DCD_EP_Close (pcore , USBD_Dev_DS4_D2H_EP);
-
-	USBD_Dev_DS4_IsActive = 0;
-	USBD_Host_Is_PS4 = 0;
 
 	dbg_printf(DBGMODE_TRACE, "USBD_Dev_DS4_ClassDeInit\r\n");
 
@@ -376,21 +374,27 @@ uint8_t USBD_Dev_DS4_Setup(void *pcore , USB_SETUP_REQ  *req)
 	if ((req->bmRequest & USB_REQ_RECIPIENT_MASK) == USB_REQ_RECIPIENT_INTERFACE && (req->bmRequest & USB_REQ_TYPE_MASK) == USB_REQ_TYPE_CLASS && (req->bmRequest & 0x80) == USB_D2H && req->bRequest == 0x01 && req->wIndex == 0)
 	{
 		if (req->wValue == 0x0302) {
-			USBD_Host_Is_PS4 = 1;
+			EMU_USBD_Host = USBDHOST_PS4;
 			USBD_Dev_DS_bufTemp[0] = 0x02;
-			memcpy(&USBD_Dev_DS_bufTemp[1], flashfilesystem.nvm_file->d.fmt.report_02, req->wLength - 1);
+			memcpy(&USBD_Dev_DS_bufTemp[1], ffsys.nvm_file->d.fmt.report_02, req->wLength - 1);
 			USBD_CtlSendData (pcore, (uint8_t *)USBD_Dev_DS_bufTemp, req->wLength);
 		}
 		else if (req->wValue == 0x03A3) {
-			USBD_Host_Is_PS4 = 1;
+			// this seems like some form of manufacturing date
+			EMU_USBD_Host = USBDHOST_PS4;
 			USBD_Dev_DS_bufTemp[0] = 0xA3;
-			memcpy(&USBD_Dev_DS_bufTemp[1], flashfilesystem.nvm_file->d.fmt.report_a3, req->wLength - 1);
+			memcpy(&USBD_Dev_DS_bufTemp[1], ffsys.nvm_file->d.fmt.report_A3, req->wLength - 1);
 			USBD_CtlSendData (pcore, (uint8_t *)USBD_Dev_DS_bufTemp, req->wLength);
 		}
 		else if (req->wValue == 0x0312) {
-			USBD_Host_Is_PS4 = 1;
+			// report 12 contains both party's BD_ADDR, if the PS4's address is wrong, the PS4 will send another report to correct it
+			EMU_USBD_Host = USBDHOST_PS4;
 			USBD_Dev_DS_bufTemp[0] = 0x12;
-			memcpy(&USBD_Dev_DS_bufTemp[1], flashfilesystem.nvm_file->d.fmt.report_12, req->wLength - 1);
+			memcpy(&USBD_Dev_DS_bufTemp[1], hci_local_bd_addr(), BD_ADDR_LEN);
+			USBD_Dev_DS_bufTemp[1 + BD_ADDR_LEN] = 0x08;
+			USBD_Dev_DS_bufTemp[2 + BD_ADDR_LEN] = 0x25;
+			USBD_Dev_DS_bufTemp[3 + BD_ADDR_LEN] = 0x00;
+			memset(&USBD_Dev_DS_bufTemp[4 + BD_ADDR_LEN], 0, BD_ADDR_LEN);
 			USBD_CtlSendData (pcore, (uint8_t *)USBD_Dev_DS_bufTemp, req->wLength);
 		}
 		else {
@@ -401,17 +405,7 @@ uint8_t USBD_Dev_DS4_Setup(void *pcore , USB_SETUP_REQ  *req)
 	}
 	else if ((req->bmRequest & USB_REQ_RECIPIENT_MASK) == USB_REQ_RECIPIENT_INTERFACE && (req->bmRequest & USB_REQ_TYPE_MASK) == USB_REQ_TYPE_CLASS && (req->bmRequest & 0x80) == USB_H2D && req->bRequest == 0x09 && req->wIndex == 0)
 	{
-		if (req->wValue == 0x0312) {
-			// this we can ignore
-			USBD_Host_Is_PS4 = 1;
-		}
-		else if (req->wValue == 0x0313) {
-			// incoming mac address
-			USBD_Host_Is_PS4 = 1;
-		}
-		else {
-			dbg_printf(DBGMODE_ERR, "Unknown SET_REPORT from PS4, wValue 0x%04X\r\n", req->wValue);
-		}
+		// incoming report, the data is not here yet, handled in DataOut
 
 		USBD_Dev_DS_lastWValue = req->wValue;
 		USBD_CtlPrepareRx (pcore, (uint8_t *)USBD_Dev_DS_bufTemp, req->wLength);
@@ -480,6 +474,11 @@ uint8_t USBD_Dev_DS4_Setup(void *pcore , USB_SETUP_REQ  *req)
 							len = USBD_Dev_DS4_HIDReportDescriptor_SIZE;
 						else
 							len = req->wLength;
+
+						// well, at this point, we are guaranteed to have already sent this report
+						if (USBD_Dev_DS4_DeviceDescriptor_Cache != 0) {
+							free(USBD_Dev_DS4_DeviceDescriptor_Cache);
+						}
 					}
 					else if( req->wValue >> 8 == HID_DESCRIPTOR_TYPE)
 					{
@@ -516,13 +515,11 @@ uint8_t USBD_Dev_DS4_SendReport (USB_OTG_CORE_HANDLE *pcore,
 {
 	static char repCnt;
 
-	if (pcore->dev.device_status == USB_OTG_CONFIGURED && USBD_Dev_DS4_IsActive != 0)
+	if (pcore->dev.device_status == USB_OTG_CONFIGURED)
 	{
 		dbgwdg_feed();
 
 		DCD_EP_Tx (pcore, USBD_Dev_DS4_D2H_EP, report, len);
-
-		ds4_rpt_cnt++;
 
 		if (repCnt > 50) {
 			led_1_tog();
@@ -561,22 +558,19 @@ uint8_t USBD_Dev_DS4_DataOut            (void *pcore , uint8_t epnum)
 	{
 		if (USBD_Dev_DS_lastWValue == 0x0313)
 		{
-			nvm_file_t* f = &flashfilesystem.cache;
-			memcpy(f->d.fmt.report_13, &(USBD_Dev_DS_bufTemp[1]), 6 + 8 + 8);
-			flashfilesystem.cache_dirty = 1;
-			flashfile_cacheFlush();
+			memcpy(ps4_bdaddr, &(USBD_Dev_DS_bufTemp[1]), BD_ADDR_LEN);
+			memcpy(ps4_link_key, &(USBD_Dev_DS_bufTemp[1 + BD_ADDR_LEN]), LINK_KEY_LEN);
+			flashfile_updateEntry(ffsys.nvm_file->d.fmt.ps4_bdaddr, ps4_bdaddr, BD_ADDR_LEN, 1);
+			flashfile_updateEntry(ffsys.nvm_file->d.fmt.ps4_link_key, ps4_link_key, LINK_KEY_LEN, 1);
+			DS4EMU_State |= EMUSTATE_HAS_PS4_BDADDR;
 		}
 		else if (USBD_Dev_DS_lastWValue == 0x0312)
 		{
 			// this event doesn't happen but it can theoretically happen
-			nvm_file_t* f = &flashfilesystem.cache;
-			memcpy(f->d.fmt.report_12, &(USBD_Dev_DS_bufTemp[1]), 3 * 5);
-			flashfilesystem.cache_dirty = 1;
-			flashfile_cacheFlush();
 		}
 		else if (USBD_Dev_DS_lastWValue == 0x0314)
 		{
-			// TODO: should we handle this?
+			// TODO: should we handle this? this means the PS4 wants the DS4 to establish a connection
 		}
 		USBD_CtlSendStatus(pcore);
 	}
@@ -594,8 +588,15 @@ uint8_t USBD_Dev_DS4_SOF(void *pcore)
 
 uint8_t* USBD_Dev_DS4_GetDeviceDescriptor( uint8_t speed , uint16_t *length)
 {
-	*length = sizeof(USBD_Dev_DS4_DeviceDescriptor);
-	return USBD_Dev_DS4_DeviceDescriptor;
+	uint16_t* ptr;
+
+	ptr = &USBD_Dev_DS4_DeviceDescriptor_Cache[8];
+	*ptr = ffsys.nvm_file->d.fmt.ds4_vid;
+	ptr = &USBD_Dev_DS4_DeviceDescriptor_Cache[10];
+	*ptr = ffsys.nvm_file->d.fmt.ds4_pid;
+
+	*length = USBD_Dev_DS4_DeviceDescriptor_SIZE;
+	return USBD_Dev_DS4_DeviceDescriptor_Cache;
 }
 
 uint8_t* USBD_Dev_DS4_GetConfigDescriptor( uint8_t speed , uint16_t *length)

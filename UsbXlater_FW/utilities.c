@@ -8,6 +8,9 @@
 
 uint8_t dbgmode = 0; // stores runtime debug level
 uint8_t global_temp_buff[GLOBAL_TEMP_BUFF_SIZE]; // this buffer is shared between many modules, do not use within interrupts!
+volatile uint32_t dbg_cnt = 0;
+volatile void* dbg_obj = 0;
+volatile size_t stack_at_main;
 
 #define BOOTLOADER_ADDR 0x1FFF0000
 #define BOOTLOADER_STACK 0x20001000
@@ -30,6 +33,12 @@ void jump_to_bootloader(void)
 	while(1);
 }
 
+int current_stack_depth() {
+	volatile int obj = 123;
+	volatile size_t cur_stack = (size_t)&obj;
+	return stack_at_main - cur_stack;
+}
+
 uint16_t fletcher16(uint8_t const * data, size_t bytes)
 {
 	uint16_t sum1 = 0xff, sum2 = 0xff;
@@ -46,28 +55,6 @@ uint16_t fletcher16(uint8_t const * data, size_t bytes)
 	sum1 = (sum1 & 0xff) + (sum1 >> 8);
 	sum2 = (sum2 & 0xff) + (sum2 >> 8);
 	return sum2 << 8 | sum1;
-}
-
-uint32_t version_crc()
-{
-	int i = sprintf(global_temp_buff, "Compiled on " __DATE__ ", " __TIME__", ");
-	#ifdef __GNUC__
-	i += sprintf(&global_temp_buff[i], "GNU C %d", __GNUC__);
-	#ifdef __GNUC_MINOR__
-	i += sprintf(&global_temp_buff[i], ".%d", __GNUC_MINOR__);
-	#ifdef __GNUC_PATCHLEVEL__
-	i += sprintf(&global_temp_buff[i], ".%d", __GNUC_PATCHLEVEL__);
-	#endif
-	#endif
-	#else
-	i += sprintf(&global_temp_buff[i], "unknown compiler\r\n");
-	#endif
-	global_temp_buff[i++] = 0;
-	global_temp_buff[i++] = 0;
-	global_temp_buff[i++] = 0;
-	global_temp_buff[i++] = 0;
-	CRC_ResetDR();
-	return CRC_CalcBlockCRC((uint32_t*)global_temp_buff, i / 4);
 }
 
 uint8_t* print_bdaddr(uint8_t* data)
@@ -100,7 +87,7 @@ int freeRam()
 	free(hTop);
 
 	// The difference is the free, available ram.
-	return stackTop - heapTop;
+	return (stackTop - heapTop);// - current_stack_depth();
 }
 
 #ifdef  USE_FULL_ASSERT

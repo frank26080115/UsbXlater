@@ -80,7 +80,7 @@ void sdp_init(){
 // register packet handler
 void sdp_register_packet_handler(void (*handler)(void * connection, uint8_t packet_type,
                                                  uint16_t channel, uint8_t *packet, uint16_t size)){
-	app_packet_handler = handler;
+    app_packet_handler = handler;
     l2cap_cid = 0;
 }
 
@@ -101,7 +101,7 @@ static void sdp_emit_service_registered(void *connection, uint32_t handle, uint8
     event[2] = status;
     bt_store_32(event, 3, handle);
     hci_dump_packet(HCI_EVENT_PACKET, 0, event, sizeof(event));
-	(*app_packet_handler)(connection, HCI_EVENT_PACKET, 0, (uint8_t *) event, sizeof(event));
+    (*app_packet_handler)(connection, HCI_EVENT_PACKET, 0, (uint8_t *) event, sizeof(event));
 }
 
 service_record_item_t * sdp_get_record_for_handle(uint32_t handle){
@@ -137,7 +137,9 @@ uint32_t sdp_register_service_internal(void *connection, service_record_item_t *
     uint32_t record_handle = record_item->service_record_handle;
     // get actual record
     uint8_t *record = record_item->service_record;
-    
+
+    //de_dump_data_element(record);
+
     // check for ServiceRecordHandle attribute, returns pointer or null
     uint8_t * req_record_handle = sdp_get_attribute_value_for_attribute_id(record, SDP_ServiceRecordHandle);
     if (!req_record_handle) {
@@ -559,10 +561,14 @@ int sdp_handle_service_search_attribute_request(uint8_t * packet, uint16_t remot
 }
 
 static void sdp_try_respond(void){
-    if (!sdp_response_size ) return;
-    if (!l2cap_cid) return;
-    if (!l2cap_can_send_packet_now(l2cap_cid)) return;
-    
+    if (!sdp_response_size ) return; // skip the tasks if there is nothing to do
+    if (!l2cap_cid) return; // skip the task if there is no channel to send to
+
+    if (!l2cap_can_send_packet_now(l2cap_cid)) {
+        // this shouldn't really happen
+        return;
+    }
+
     // update state before sending packet (avoid getting called when new l2cap credit gets emitted)
     uint16_t size = sdp_response_size;
     sdp_response_size = 0;
@@ -571,14 +577,14 @@ static void sdp_try_respond(void){
 
 // we assume that we don't get two requests in a row
 static void sdp_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size){
-	uint16_t transaction_id;
+    uint16_t transaction_id;
     SDP_PDU_ID_t pdu_id;
     uint16_t remote_mtu;
     // uint16_t param_len;
-    
-	switch (packet_type) {
-			
-		case L2CAP_DATA_PACKET:
+
+    switch (packet_type) {
+
+        case L2CAP_DATA_PACKET:
             pdu_id = (SDP_PDU_ID_t) packet[0];
             transaction_id = READ_NET_16(packet, 1);
             // param_len = READ_NET_16(packet, 3);
@@ -588,7 +594,7 @@ static void sdp_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *p
                 remote_mtu = SDP_RESPONSE_BUFFER_SIZE;
             }
             
-            // printf("SDP Request: type %u, transaction id %u, len %u, mtu %u\n", pdu_id, transaction_id, param_len, remote_mtu);
+            // log_info("SDP Request: type %u, transaction id %u, len %u, mtu %u\n", pdu_id, transaction_id, param_len, remote_mtu);
             switch (pdu_id){
                     
                 case SDP_ServiceSearchRequest:
@@ -607,16 +613,16 @@ static void sdp_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *p
                     sdp_response_size = sdp_create_error_response(transaction_id, 0x0003); // invalid syntax
                     break;
             }
-            
-            sdp_try_respond();
-            
-			break;
-			
-		case HCI_EVENT_PACKET:
-			
-			switch (packet[0]) {
 
-				case L2CAP_EVENT_INCOMING_CONNECTION:
+            sdp_try_respond();
+
+            break;
+            
+        case HCI_EVENT_PACKET:
+            
+            switch (packet[0]) {
+
+                case L2CAP_EVENT_INCOMING_CONNECTION:
                     if (l2cap_cid) {
                         // CONNECTION REJECTED DUE TO LIMITED RESOURCES 
                         l2cap_decline_connection_internal(channel, 0x04);
@@ -626,7 +632,7 @@ static void sdp_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *p
                     l2cap_cid = channel;
                     sdp_response_size = 0;
                     l2cap_accept_connection_internal(channel);
-					break;
+                    break;
                     
                 case L2CAP_EVENT_CHANNEL_OPENED:
                     if (packet[2]) {
@@ -644,19 +650,20 @@ static void sdp_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *p
                     if (channel == l2cap_cid){
                         // reset
                         l2cap_cid = 0;
+                        dbg_printf(DBGMODE_DEBUG, "l2cap_cid reset, freeRam %d\r\n", freeRam());
                     }
                     break;
-					                    
-				default:
-					// other event
-					break;
-			}
-			break;
-			
-		default:
-			// other packet type
-			break;
-	}
+
+                default:
+                    // other event
+                    break;
+            }
+            break;
+
+        default:
+            // other packet type
+            break;
+    }
 }
 
 // hack to add code that can access some of the static functions

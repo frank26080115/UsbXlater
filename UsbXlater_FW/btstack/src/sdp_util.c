@@ -40,6 +40,7 @@
 
 #include <btstack/sdp_util.h>
 #include <btstack/utils.h>
+#include "btstack-config.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -258,14 +259,20 @@ static void sdp_attribute_list_traverse_sequence(uint8_t * element, sdp_attribut
     while (pos < end_pos){
         de_type_t idType = de_get_element_type(element + pos);
         de_size_t idSize = de_get_size_type(element + pos);
-        if (idType != DE_UINT || idSize != DE_SIZE_16) break; // wrong type
+        if (idType != DE_UINT || idSize != DE_SIZE_16) {
+            break; // wrong type
+        }
         uint16_t attribute_id = READ_NET_16(element, pos + 1);
         pos += 3;
-        if (pos >= end_pos) break; // array out of bounds
+        if (pos >= end_pos) {
+            break; // array out of bounds
+        }
         de_type_t valueType = de_get_element_type(element + pos);
         de_size_t valueSize = de_get_size_type(element + pos);
         uint8_t done = (*handler)(attribute_id, element + pos, valueType, valueSize, context); 
-        if (done) break;
+        if (done) {
+            break;
+        }
         pos += de_get_len(element + pos);
     }
 }
@@ -458,11 +465,13 @@ struct sdp_context_attribute_by_id {
 };
 static int sdp_traversal_attribute_by_id(uint16_t attributeID, uint8_t * attributeValue, de_type_t attributeType, de_size_t size, void *my_context){
     struct sdp_context_attribute_by_id * context = (struct sdp_context_attribute_by_id *) my_context;
+    int ret = 0;
     if (attributeID == context->attributeID) {
         context->attributeValue = attributeValue;
-        return 1;
+        ret = 1;
     }
-    return 0;
+    //dbg_printf(DBGMODE_DEBUG, "sdp_traversal_attribute_by_id attributeID %d ? context->attributeID %d, *attributeValue %d, attributeType %d, size %d\r\n", attributeID, context->attributeID, *attributeValue, attributeType, size);
+    return ret;
 }
 
 uint8_t * sdp_get_attribute_value_for_attribute_id(uint8_t * record, uint16_t attributeID){
@@ -571,18 +580,18 @@ int sdp_record_matches_service_search_pattern(uint8_t *record, uint8_t *serviceS
 static int de_traversal_dump_data(uint8_t * element, de_type_t de_type, de_size_t de_size, void *my_context){
     int indent = *(int*) my_context;
     int i;
-    for (i=0; i<indent;i++) printf("    ");
+    for (i=0; i<indent;i++) dbg_printf(DBGMODE_DEBUG, "    ");
     int pos     = de_get_header_size(element);
     int end_pos = de_get_len(element);
-    printf("type %5s (%u), element len %2u ", type_names[de_type], de_type, end_pos);
+    dbg_printf(DBGMODE_DEBUG, "type %5s (%u), element len %2u ", type_names[de_type], de_type, end_pos);
     if (de_type == DE_DES) {
-		printf("\n");
+        dbg_printf(DBGMODE_DEBUG, "\n");
         indent++;
         de_traverse_sequence(element, de_traversal_dump_data, (void *)&indent);
     } else if (de_type == DE_UUID && de_size == DE_SIZE_128) {
-        printf(", value: ");
+        dbg_printf(DBGMODE_DEBUG, ", value: ");
         printUUID(element+1);
-        printf("\n");
+        dbg_printf(DBGMODE_DEBUG, "\n");
     } else if (de_type == DE_STRING) {
         int len = 0;
         switch (de_size){
@@ -595,7 +604,7 @@ static int de_traversal_dump_data(uint8_t * element, de_type_t de_type, de_size_
             default:
                 break;
         }
-        printf("len %u (0x%02x)\n", len, len);
+        dbg_printf(DBGMODE_DEBUG, "len %u (0x%02x)\n", len, len);
         hexdump(&element[pos], len);
     } else {
         uint32_t value = 0;
@@ -606,15 +615,15 @@ static int de_traversal_dump_data(uint8_t * element, de_type_t de_type, de_size_
                 }
                 break;
             case DE_SIZE_16:
-				value = READ_NET_16(element,pos);
+                value = READ_NET_16(element,pos);
                 break;
             case DE_SIZE_32:
-				value = READ_NET_32(element,pos);
+                value = READ_NET_32(element,pos);
                 break;
             default:
                 break;
         }
-        printf(", value: 0x%08" PRIx32 "\n", value);
+        dbg_printf(DBGMODE_DEBUG, ", value: 0x%08" PRIx32 "\n", value);
     }
     return 0;
 }

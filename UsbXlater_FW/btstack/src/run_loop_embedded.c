@@ -101,6 +101,11 @@ static void embedded_add_timer(timer_source_t *ts){
 #ifdef HAVE_TICK
     linked_item_t *it;
     for (it = (linked_item_t *) &timers; it->next ; it = it->next){
+        // don't add timer that's already in there
+        if ((timer_source_t *) it->next == ts){
+            log_error( "run_loop_timer_add error: timer to add already in list!\n");
+            return;
+        }
         if (ts->timeout < ((timer_source_t *) it->next)->timeout) {
             break;
         }
@@ -140,7 +145,7 @@ static void embedded_dump_timer(void){
 /**
  * Execute run_loop once
  */
-static void embedded_execute_once(void) {
+void embedded_execute_once(void) {
     data_source_t *ds;
 
     // process data sources
@@ -186,6 +191,10 @@ static void embedded_tick_handler(void){
 
 uint32_t embedded_get_ticks(void){
     return systick_1ms_cnt;
+}
+
+void embedded_set_ticks(uint32_t ticks){
+    systick_1ms_cnt = ticks;
 }
 
 uint32_t embedded_ticks_for_ms(uint32_t time_in_ms){
