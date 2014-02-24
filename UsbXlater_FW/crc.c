@@ -93,8 +93,7 @@ uint32_t crc32_accelerated(uint8_t* data, int len)
 }
 uint32_t crc32_slow(uint8_t* data, int len)
 {
-	uint32_t i = crc32_continued(0, data, 72);
-	return crc32_continued(i, &data[72], 3);
+	return crc32_continued(0, data, len);
 }
 
 uint32_t (*crc32_prefered)(uint8_t*, int);
@@ -108,7 +107,7 @@ void crc_init()
 {
 	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_CRC, ENABLE);
 
-	crc32_prefered = crc32_slow;
+	crc32_prefered = crc32_accelerated;
 
 	#ifdef PERFORM_CRC_TEST
 	uint32_t res;

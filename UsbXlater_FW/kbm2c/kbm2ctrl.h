@@ -222,7 +222,6 @@ ds3_packet_t;
 
 typedef struct
 {
-	uint8_t report_id;
 	uint8_t stick_left_x;
 	uint8_t stick_left_y;
 	uint8_t stick_right_x;
@@ -264,7 +263,8 @@ extern kbm2c_config_t kbm2c_config;
 void kbm2c_init();
 void kbm2c_handleMouseReport(uint8_t* data, uint8_t len, HID_Rpt_Parsing_Params_t* parser);
 void kbm2c_handleKeyReport(uint8_t modifier, uint8_t* data, uint8_t len);
-void kbm2c_handleDs4Report(uint8_t* data);
+void kbm2c_handleDs4UsbReport(uint8_t* data);
+void kbm2c_handleDs4BtReport(uint8_t* data, uint16_t len);
 void kbm2c_handleDs3Report(uint8_t* data);
 void kbm2c_task(char force);
 void kbm2c_prepForDS3();

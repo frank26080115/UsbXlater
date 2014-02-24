@@ -2,6 +2,8 @@
 #define FLASHFILE_H_
 
 #include <btstack/utils.h>
+#include <ds4_emu.h>
+#include <usbd_dev/usbd_dev_ds4.h>
 
 /*
 
@@ -34,15 +36,17 @@ typedef struct
 {
 	uint32_t magic;
 	union {
-		uint32_t raw[64];
+		uint32_t raw[64 - 16];
 		struct {
-			uint8_t report_A3[8 * 6];
-			uint8_t report_02[36];
+			uint8_t report_A3[DS4_REPORT_A3_LEN];
+			uint8_t report_02[DS4_REPORT_02_LEN];
 			uint16_t ds4_vid;
 			uint16_t ds4_pid;
 			uint8_t ds4_bdaddr[BD_ADDR_LEN];
+			uint8_t bt_bdaddr[BD_ADDR_LEN];
 			uint8_t ps4_bdaddr[BD_ADDR_LEN];
 			uint8_t ps4_link_key[LINK_KEY_LEN];
+			uint32_t ps4_conn_crc;
 		} fmt;
 	} d;
 	uint32_t crc;
@@ -53,7 +57,7 @@ typedef struct
 {
 	nvm_file_t* nvm_file;
 	mru_t* mru;
-	uint32_t cache[64 + 4];
+	uint32_t cache[64 - 16 + 4];
 	char cache_dirty;
 }
 flashfilesystem_t;

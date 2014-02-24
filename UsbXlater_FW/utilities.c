@@ -71,6 +71,24 @@ uint8_t* print_linkkey(uint8_t* data)
 	return &global_temp_buff[GLOBAL_TEMP_BUFF_SIZE / 2];
 }
 
+char is_array_valid(uint8_t* data, uint16_t len)
+{
+	char all0 = 1;
+	char allFF = 1;
+	for (int i = 0; i < len; i++) {
+		if (data[i] != 0x00) {
+			all0 = 0;
+		}
+		if (data[i] != 0xFF) {
+			allFF = 0;
+		}
+	}
+	if (all0 == 0 && allFF == 0) {
+		return 1;
+	}
+	return 0;
+}
+
 extern void* _sbrk(int);
 int freeRam()
 {

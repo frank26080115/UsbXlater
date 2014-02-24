@@ -136,23 +136,28 @@ typedef struct
 	volatile ptr_item_t*	out;	// current retrieval location in the circular buffer
 	volatile ptr_item_t*	start;	// pointer to the start of the buffer's underlying storage array
 	volatile ptr_item_t*	end;	// pointer to the end of the buffer's underlying storage array
-	volatile uint8_t		size;	// size of the buffer's underlying storage array
+	volatile uint8_t		queueSize;	// max num of items in queue
+	volatile uint16_t		dataSize;	// max size of item
 	volatile uint8_t		count;	// number of bytes currently stored in the buffer
 	volatile uint8_t		flag;
 	volatile uint8_t		ready;  // must be 0xAB
 } ptr_ringbuffer_t;
 
-static inline void ptr_ringbuffer_init(ptr_ringbuffer_t* buffer, const uint16_t size);
-static inline void ptr_ringbuffer_init(ptr_ringbuffer_t* buffer, const uint16_t size)
+static inline void ptr_ringbuffer_init(ptr_ringbuffer_t* buffer, const uint8_t queueSize, const uint16_t dataSize);
+static inline void ptr_ringbuffer_init(ptr_ringbuffer_t* buffer, const uint8_t queueSize, const uint16_t dataSize)
 {
-	ptr_item_t*      dataptr = calloc(size, sizeof(ptr_item_t));
+	ptr_item_t*      dataptr = calloc(queueSize, sizeof(ptr_item_t));
 	buffer->in     = dataptr;
 	buffer->out    = dataptr;
 	buffer->start  = &dataptr[0];
-	buffer->end    = &dataptr[size];
-	buffer->size   = size;
+	buffer->end    = &dataptr[queueSize];
+	buffer->queueSize = queueSize;
+	buffer->dataSize  = dataSize;
 	buffer->count  = 0;
 	buffer->flag   = 0;
+	for (int i = 0; i < queueSize; i++) {
+		dataptr[0].data = malloc(dataSize);
+	}
 	buffer->ready  = 0xAB;
 }
 
@@ -164,13 +169,8 @@ static inline void ptr_ringbuffer_push(ptr_ringbuffer_t* buffer, const void* dat
 	}
 
 	ptr_item_t* n = buffer->in;
+	if (size > buffer->dataSize) size = buffer->dataSize;
 	n->length = size;
-	n->data = malloc(sizeof(size));
-	if (n->data == 0) {
-		free(n);
-		return;
-	}
-
 	memcpy(n->data, data, size);
 
 	__disable_irq();
@@ -198,7 +198,6 @@ static inline uint16_t ptr_ringbuffer_pop(ptr_ringbuffer_t* buffer, void* dest)
 		memcpy(dest, n->data, length);
 	}
 	n->length = 0;
-	free(n->data);
 
 	if (++buffer->out == buffer->end)
 		buffer->out = buffer->start;
@@ -231,7 +230,7 @@ static inline uint16_t ptr_ringbuffer_getfreecount(ptr_ringbuffer_t* const buffe
 {
 	uint8_t tmp;
 	__disable_irq();
-	tmp = buffer->size - buffer->count;
+	tmp = buffer->queueSize - buffer->count;
 	__enable_irq();
 	return tmp;
 }
@@ -247,7 +246,7 @@ static inline uint16_t ptr_ringbuffer_isfull(ptr_ringbuffer_t* const buffer)
 {
 	bool tmp;
 	__disable_irq();
-	tmp = buffer->size <= buffer->count;
+	tmp = buffer->queueSize <= buffer->count;
 	__enable_irq();
 	return tmp;
 }

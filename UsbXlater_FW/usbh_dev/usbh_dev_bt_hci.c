@@ -308,12 +308,12 @@ char USBH_Dev_BtHci_CanSendPacket(USB_OTG_CORE_HANDLE *pcore , USBH_DEV *pdev)
 	static uint8_t last_reason;
 
 	if (io->remaining > 0) {
-		if (last_reason != 1) dbg_printf(DBGMODE_DEBUG, "CanSendPacket refused due to waiting data\r\n");
+		//if (last_reason != 1) dbg_printf(DBGMODE_DEBUG, "CanSendPacket refused due to waiting data\r\n");
 		last_reason = 1;
 		return 0;
 	}
 	if (io->state != UIOSTATE_NEXT) {
-		if (last_reason != 2) dbg_printf(DBGMODE_DEBUG, "CanSendPacket refused due to waiting transfer\r\n");
+		//if (last_reason != 2) dbg_printf(DBGMODE_DEBUG, "CanSendPacket refused due to waiting transfer\r\n");
 		last_reason = 2;
 		return 0;
 	}

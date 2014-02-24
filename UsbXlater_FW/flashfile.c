@@ -53,7 +53,8 @@ void flashfile_sectorDump()
 {
 	dbg_printf(DBGMODE_DEBUG, "flashfile_sectorDump\r\n");
 
-	uint32_t magic = version_crc() ^ FLASHFILE_MAGIC;
+	uint32_t magic = FLASHFILE_MAGIC;
+	//magic ^= version_crc();
 
 	dbg_printf(DBGMODE_DEBUG, "magic 0x%08X, start 0x%08X, size 0x%08X, end 0x%08X, sect 0x%08X\r\n\r\n", magic, FLASHFILE_PAGE_START, FLASHFILE_PAGE_SIZE, FLASHFILE_PAGE_END, FLASHFILE_SECTOR);
 
@@ -125,6 +126,12 @@ void flashfile_sectorDump()
 	dbg_printf(DBGMODE_DEBUG, ":00000001FF\r\n\r\n"); // end of file
 }
 
+void flashfile_tryClearError()
+{
+	FLASH->SR = FLASH->SR & 0xF3;
+	FLASH_Unlock();
+}
+
 nvm_file_t* flashfile_findNvmFile()
 {
 	uint32_t magic = FLASHFILE_MAGIC;
@@ -136,7 +143,7 @@ nvm_file_t* flashfile_findNvmFile()
 		if (possibleFile->magic == magic)
 		{
 			dbg_printf(DBGMODE_DEBUG, "possible NVM file magic (0x%08X) matched at 0x%08X, ", magic, i);
-			uint32_t crc = crc32_prefered((uint8_t*)i, sizeof(nvm_file_t) - sizeof(uint32_t));
+			uint32_t crc = crc32_calc((uint8_t*)i, sizeof(nvm_file_t) - sizeof(uint32_t));
 			dbg_printf(DBGMODE_DEBUG, "crc calculated = 0x%08X, crc read = 0x%08X\r\n", crc, possibleFile->crc);
 			if (possibleFile->crc == crc) {
 				dbg_printf(DBGMODE_DEBUG, "NVM file CRC matches\r\n");
@@ -208,9 +215,10 @@ int flashfile_writeMru(mru_t data)
 		ffsys.cache_dirty = 0;
 
 		// refresh magic and CRC just in case
-		uint32_t magic = version_crc() ^ FLASHFILE_MAGIC;
+		uint32_t magic = FLASHFILE_MAGIC;
+		//magic ^= version_crc();
 		cache->magic = magic;
-		uint32_t crc = crc32_prefered((uint8_t*)cache, sizeof(nvm_file_t) - sizeof(uint32_t));
+		uint32_t crc = crc32_calc((uint8_t*)cache, sizeof(nvm_file_t) - sizeof(uint32_t));
 		cache->crc = crc;
 
 		FLASH_Unlock();
@@ -225,14 +233,15 @@ int flashfile_writeMru(mru_t data)
 			else if (status != FLASH_COMPLETE)
 			{
 				retry++; busyRetry = 0;
-				dbg_printf(DBGMODE_DEBUG, "Error flashfile_writeMru unable to erase sector, status = 0x%08X on attempt %d\r\n", status, retry);
+				dbg_printf(DBGMODE_DEBUG, "Error flashfile_writeMru unable to erase sector, status = 0x%02X 0x%08X on attempt %d\r\n", status, FLASH->SR, retry);
+				flashfile_tryClearError();
 			}
 		}
 		while (retry < FLASHFILE_RETRY_MAX && busyRetry < FLASHFILE_BUSY_MAX && status != FLASH_COMPLETE);
 
 		if (status != FLASH_COMPLETE)
 		{
-			dbg_printf(DBGMODE_ERR, "Error, flash op timeout, F " __FILE__ ", L %d, s 0x%08X, R %d, BR %d\r\n", __LINE__, status, retry, busyRetry);
+			dbg_printf(DBGMODE_ERR, "Error, flash op timeout, F " __FILE__ ", L %d, s 0x%02X 0x%08X, R %d, BR %d\r\n", __LINE__, status, FLASH->SR, retry, busyRetry);
 			FLASH_Lock();
 			return -1;
 		}
@@ -250,14 +259,15 @@ int flashfile_writeMru(mru_t data)
 				else if (status != FLASH_COMPLETE)
 				{
 					retry++; busyRetry = 0;
-					dbg_printf(DBGMODE_ERR, "Error flashfile_writeMru unable to write address 0x%08X data 0x%02X, status = 0x%08X on attempt %d\r\n", i, cache[j], status, retry);
+					dbg_printf(DBGMODE_ERR, "Error flashfile_writeMru unable to write address 0x%08X data 0x%02X, status = 0x%02X 0x%08X on attempt %d\r\n", i, cache[j], status, FLASH->SR, retry);
+					flashfile_tryClearError();
 				}
 			}
 			while (retry < FLASHFILE_RETRY_MAX && busyRetry < FLASHFILE_BUSY_MAX && status != FLASH_COMPLETE);
 
 			if (status != FLASH_COMPLETE)
 			{
-				dbg_printf(DBGMODE_ERR, "Error, flash op timeout, F " __FILE__ ", L %d, s 0x%08X, R %d, BR %d\r\n", __LINE__, status, retry, busyRetry);
+				dbg_printf(DBGMODE_ERR, "Error, flash op timeout, F " __FILE__ ", L %d, s 0x%02X 0x%08X, R %d, BR %d\r\n", __LINE__, status, FLASH->SR, retry, busyRetry);
 				FLASH_Lock();
 				return -2;
 			}
@@ -300,14 +310,15 @@ int flashfile_writeMru(mru_t data)
 				else if (status != FLASH_COMPLETE)
 				{
 					retry++; busyRetry = 0;
-					dbg_printf(DBGMODE_ERR, "Error flashfile_writeMru unable to destroy MRU at address 0x%08X, status = 0x%08X on attempt %d\r\n", (uint32_t)ffsys.mru, status, retry);
+					dbg_printf(DBGMODE_ERR, "Error flashfile_writeMru unable to destroy MRU at address 0x%08X, status = 0x%02X 0x%08X on attempt %d\r\n", (uint32_t)ffsys.mru, status, FLASH->SR, retry);
+					flashfile_tryClearError();
 				}
 			}
 			while (retry < FLASHFILE_RETRY_MAX && busyRetry < FLASHFILE_BUSY_MAX && status != FLASH_COMPLETE);
 
 			if (status != FLASH_COMPLETE)
 			{
-				dbg_printf(DBGMODE_ERR, "Error, flash op timeout, F " __FILE__ ", L %d, s 0x%08X, R %d, BR %d\r\n", __LINE__, status, retry, busyRetry);
+				dbg_printf(DBGMODE_ERR, "Error, flash op timeout, F " __FILE__ ", L %d, s 0x%02X 0x%08X, R %d, BR %d\r\n", __LINE__, status, FLASH->SR, retry, busyRetry);
 				FLASH_Lock();
 				return -3;
 			}
@@ -346,14 +357,15 @@ int flashfile_writeMru(mru_t data)
 		else if (status != FLASH_COMPLETE)
 		{
 			retry++; busyRetry = 0;
-			dbg_printf(DBGMODE_ERR, "Error flashfile_writeMru unable to write MRU at address 0x%08X data 0x%08X, status = 0x%08X on attempt %d\r\n", (uint32_t)ffsys.mru, data, status, retry);
+			dbg_printf(DBGMODE_ERR, "Error flashfile_writeMru unable to write MRU at address 0x%08X data 0x%08X, status = 0x%02X 0x%08X on attempt %d\r\n", (uint32_t)ffsys.mru, data, status, FLASH->SR, retry);
+			flashfile_tryClearError();
 		}
 	}
 	while (retry < FLASHFILE_RETRY_MAX && busyRetry < FLASHFILE_BUSY_MAX && status != FLASH_COMPLETE);
 
 	if (status != FLASH_COMPLETE)
 	{
-		dbg_printf(DBGMODE_ERR, "Error, flash op timeout, F " __FILE__ ", L %d, s 0x%08X, R %d, BR %d\r\n", __LINE__, status, retry, busyRetry);
+		dbg_printf(DBGMODE_ERR, "Error, flash op timeout, F " __FILE__ ", L %d, s 0x%02X 0x%08X, R %d, BR %d\r\n", __LINE__, status, FLASH->SR, retry, busyRetry);
 		FLASH_Lock();
 		return -4;
 	}
@@ -369,9 +381,10 @@ int flashfile_writeNvmFile(nvm_file_t* data)
 	int retry, busyRetry;
 
 	// ensure magic and CRC are right
-	uint32_t magic = version_crc() ^ FLASHFILE_MAGIC;
+	uint32_t magic = FLASHFILE_MAGIC;
+	//magic ^= version_crc();
 	data->magic = magic;
-	uint32_t crc = crc32_prefered((uint8_t*)data, sizeof(nvm_file_t) - sizeof(uint32_t));
+	uint32_t crc = crc32_calc((uint8_t*)data, sizeof(nvm_file_t) - sizeof(uint32_t));
 	data->crc = crc;
 
 	mru_t old_mru = 1;
@@ -430,14 +443,15 @@ int flashfile_writeNvmFile(nvm_file_t* data)
 			else if (status != FLASH_COMPLETE)
 			{
 				retry++; busyRetry = 0;
-				dbg_printf(DBGMODE_ERR, "Error flashfile_writeNvmFile unable to erase sector, status = 0x%08X on attempt %d\r\n", status, retry);
+				dbg_printf(DBGMODE_ERR, "Error flashfile_writeNvmFile unable to erase sector, status = 0x%02X 0x%08X on attempt %d\r\n", status, FLASH->SR, retry);
+				flashfile_tryClearError();
 			}
 		}
 		while (retry < FLASHFILE_RETRY_MAX && busyRetry < FLASHFILE_BUSY_MAX && status != FLASH_COMPLETE);
 
 		if (status != FLASH_COMPLETE)
 		{
-			dbg_printf(DBGMODE_ERR, "Error, flash op timeout, F " __FILE__ ", L %d, s 0x%08X, R %d, BR %d\r\n", __LINE__, status, retry, busyRetry);
+			dbg_printf(DBGMODE_ERR, "Error, flash op timeout, F " __FILE__ ", L %d, s 0x%02X 0x%08X, R %d, BR %d\r\n", __LINE__, status, FLASH->SR, retry, busyRetry);
 			FLASH_Lock();
 			return -1;
 		}
@@ -459,7 +473,8 @@ int flashfile_writeNvmFile(nvm_file_t* data)
 			else if (status != FLASH_COMPLETE)
 			{
 				retry++; busyRetry = 0;
-				dbg_printf(DBGMODE_ERR, "Error flashfile_writeNvmFile unable to destroy magic at address 0x%08X, status = 0x%08X on attempt %d\r\n", (uint32_t)ffsys.nvm_file, status, retry);
+				dbg_printf(DBGMODE_ERR, "Error flashfile_writeNvmFile unable to destroy magic at address 0x%08X, status = 0x%02X 0x%08X on attempt %d\r\n", (uint32_t)ffsys.nvm_file, status, FLASH->SR, retry);
+				flashfile_tryClearError();
 			}
 		}
 		while (retry < FLASHFILE_RETRY_MAX && busyRetry < FLASHFILE_BUSY_MAX && status != FLASH_COMPLETE);
@@ -479,14 +494,15 @@ int flashfile_writeNvmFile(nvm_file_t* data)
 			else if (status != FLASH_COMPLETE)
 			{
 				retry++; busyRetry = 0;
-				dbg_printf(DBGMODE_ERR, "Error flashfile_writeNvmFile unable to write address 0x%08X data 0x%02X, status = 0x%08X on attempt %d\r\n", i, p[j], status, retry);
+				dbg_printf(DBGMODE_ERR, "Error flashfile_writeNvmFile unable to write address 0x%08X data 0x%02X, status = 0x%02X 0x%08X on attempt %d\r\n", i, p[j], status, FLASH->SR, retry);
+				flashfile_tryClearError();
 			}
 		}
 		while (retry < FLASHFILE_RETRY_MAX && busyRetry < FLASHFILE_BUSY_MAX && status != FLASH_COMPLETE);
 
 		if (status != FLASH_COMPLETE)
 		{
-			dbg_printf(DBGMODE_ERR, "Error, flash op timeout, F " __FILE__ ", L %d, s 0x%08X, R %d, BR %d\r\n", __LINE__, status, retry, busyRetry);
+			dbg_printf(DBGMODE_ERR, "Error, flash op timeout, F " __FILE__ ", L %d, s 0x%02X 0x%08X, R %d, BR %d\r\n", __LINE__, status, FLASH->SR, retry, busyRetry);
 			FLASH_Lock();
 			return -2;
 		}
@@ -519,14 +535,15 @@ int flashfile_writeNvmFile(nvm_file_t* data)
 		else if (status != FLASH_COMPLETE)
 		{
 			retry++;
-			dbg_printf(DBGMODE_ERR, "Error flashfile_writeNvmFile unable to write MRU at address 0x%08X data 0x%08X, status = 0x%08X on attempt %d\r\n", (uint32_t)ffsys.mru, old_mru, status, retry);
+			dbg_printf(DBGMODE_ERR, "Error flashfile_writeNvmFile unable to write MRU at address 0x%08X data 0x%08X, status = 0x%02X 0x%08X on attempt %d\r\n", (uint32_t)ffsys.mru, old_mru, status, FLASH->SR, retry);
+			flashfile_tryClearError();
 		}
 	}
 	while (retry < FLASHFILE_RETRY_MAX && busyRetry < FLASHFILE_BUSY_MAX && status != FLASH_COMPLETE);
 
 	if (status != FLASH_COMPLETE)
 	{
-		dbg_printf(DBGMODE_ERR, "Error, flash op timeout, F " __FILE__ ", L %d, s 0x%08X, R %d, BR %d\r\n", __LINE__, status, retry, busyRetry);
+		dbg_printf(DBGMODE_ERR, "Error, flash op timeout, F " __FILE__ ", L %d, s 0x%02X 0x%08X, R %d, BR %d\r\n", __LINE__, status, FLASH->SR, retry, busyRetry);
 		FLASH_Lock();
 		return -3;
 	}
@@ -551,7 +568,7 @@ int flashfile_writeDefaultNvmFile()
 
 void flashfile_updateEntry(void* dest, void* src, uint8_t len, char now)
 {
-	if (memcmp(dest, src, len) == 0)
+	if (memcmp(dest, src, len) == 0 && ffsys.cache_dirty == 0)
 		return;
 
 	uint32_t offset = (uint32_t)dest - (uint32_t)ffsys.nvm_file;

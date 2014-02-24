@@ -14,13 +14,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define USBD_DEV_DS4_Feature_A3_SIZE 49
 const uint8_t USBD_DEV_DS4_Feature_A3[USBD_DEV_DS4_Feature_A3_SIZE] = { 0xA3, 0x41, 0x75, 0x67, 0x20, 0x20, 0x33, 0x20, 0x32, 0x30, 0x31, 0x33, 0x00, 0x00, 0x00, 0x00, 0x00, 0x30, 0x37, 0x3A, 0x30, 0x31, 0x3A, 0x31, 0x32, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x31, 0x03, 0x00, 0x00, 0x00, 0x49, 0x00, 0x05, 0x00, 0x00, 0x80, 0x03, 0x00 };
-
-#define USBD_DEV_DS4_Feature_02_SIZE 37
 const uint8_t USBD_DEV_DS4_Feature_02[USBD_DEV_DS4_Feature_02_SIZE] = { 0x02, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x87, 0x22, 0x7B, 0xDD, 0xB2, 0x22, 0x47, 0xDD, 0xBD, 0x22, 0x43, 0xDD, 0x1C, 0x02, 0x1C, 0x02, 0x7F, 0x1E, 0x2E, 0xDF, 0x60, 0x1F, 0x4C, 0xE0, 0x3A, 0x1D, 0xC6, 0xDE, 0x08, 0x00 };
-
-#define USBD_DEV_DS4_Feature_12_SIZE 16
 const uint8_t USBD_DEV_DS4_Feature_12[USBD_DEV_DS4_Feature_12_SIZE] = { 0x12, 0x8B, 0x09, 0x07, 0x6D, 0x66, 0x1C, 0x08, 0x25, 0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
 
 #define USBD_Dev_DS4_DeviceDescriptor_SIZE 18
@@ -43,7 +38,7 @@ const uint8_t USBD_Dev_DS4_DeviceDescriptor[USBD_Dev_DS4_DeviceDescriptor_SIZE] 
 0x01,        // bNumConfigurations 1
 };
 
-uint8_t* USBD_Dev_DS4_DeviceDescriptor_Cache;
+uint8_t* USBD_Dev_DS4_DeviceDescriptor_Cache = 0;
 
 #define USBD_Dev_DS4_ConfigurationDescriptor_SIZE 41
 const uint8_t USBD_Dev_DS4_ConfigurationDescriptor[USBD_Dev_DS4_ConfigurationDescriptor_SIZE] = {
@@ -335,6 +330,7 @@ const uint8_t USBD_Dev_DS4_HIDDescriptor[USBD_Dev_DS4_HIDDescriptor_SIZE] = {
 };
 
 static uint8_t USBD_HID_Protocol, USBD_HID_IdleState, USBD_HID_AltSet;
+char USBD_Dev_DS4_NeedsWriteFlash = 0;
 
 uint8_t USBD_Dev_DS4_ClassInit(void *pcore , uint8_t cfgidx)
 {
@@ -349,9 +345,6 @@ uint8_t USBD_Dev_DS4_ClassInit(void *pcore , uint8_t cfgidx)
                 USBD_Dev_DS4_H2D_EP_SZ,
                 USB_OTG_EP_INT);
 	DCD_EP_Flush(pcore, USBD_Dev_DS4_H2D_EP);
-
-	USBD_Dev_DS4_DeviceDescriptor_Cache = malloc(USBD_Dev_DS4_DeviceDescriptor_SIZE);
-	memcpy(USBD_Dev_DS4_DeviceDescriptor_Cache, USBD_Dev_DS4_DeviceDescriptor, USBD_Dev_DS4_DeviceDescriptor_SIZE);
 }
 
 uint8_t USBD_Dev_DS4_ClassDeInit(void *pcore , uint8_t cfgidx)
@@ -394,7 +387,12 @@ uint8_t USBD_Dev_DS4_Setup(void *pcore , USB_SETUP_REQ  *req)
 			USBD_Dev_DS_bufTemp[1 + BD_ADDR_LEN] = 0x08;
 			USBD_Dev_DS_bufTemp[2 + BD_ADDR_LEN] = 0x25;
 			USBD_Dev_DS_bufTemp[3 + BD_ADDR_LEN] = 0x00;
-			memset(&USBD_Dev_DS_bufTemp[4 + BD_ADDR_LEN], 0, BD_ADDR_LEN);
+			if (ds4emu_isPs4ConnValid() == 1) {
+				memcpy(&USBD_Dev_DS_bufTemp[4 + BD_ADDR_LEN], ffsys.nvm_file->d.fmt.ps4_bdaddr, BD_ADDR_LEN);
+			}
+			else {
+				memset(&USBD_Dev_DS_bufTemp[4 + BD_ADDR_LEN], 0, BD_ADDR_LEN);
+			}
 			USBD_CtlSendData (pcore, (uint8_t *)USBD_Dev_DS_bufTemp, req->wLength);
 		}
 		else {
@@ -478,6 +476,7 @@ uint8_t USBD_Dev_DS4_Setup(void *pcore , USB_SETUP_REQ  *req)
 						// well, at this point, we are guaranteed to have already sent this report
 						if (USBD_Dev_DS4_DeviceDescriptor_Cache != 0) {
 							free(USBD_Dev_DS4_DeviceDescriptor_Cache);
+							USBD_Dev_DS4_DeviceDescriptor_Cache = 0;
 						}
 					}
 					else if( req->wValue >> 8 == HID_DESCRIPTOR_TYPE)
@@ -560,8 +559,8 @@ uint8_t USBD_Dev_DS4_DataOut            (void *pcore , uint8_t epnum)
 		{
 			memcpy(ps4_bdaddr, &(USBD_Dev_DS_bufTemp[1]), BD_ADDR_LEN);
 			memcpy(ps4_link_key, &(USBD_Dev_DS_bufTemp[1 + BD_ADDR_LEN]), LINK_KEY_LEN);
-			flashfile_updateEntry(ffsys.nvm_file->d.fmt.ps4_bdaddr, ps4_bdaddr, BD_ADDR_LEN, 1);
-			flashfile_updateEntry(ffsys.nvm_file->d.fmt.ps4_link_key, ps4_link_key, LINK_KEY_LEN, 1);
+			USBD_Dev_DS4_NeedsWriteFlash = 1;
+			EMU_USBD_Host = USBDHOST_PS4;
 			DS4EMU_State |= EMUSTATE_HAS_PS4_BDADDR;
 		}
 		else if (USBD_Dev_DS_lastWValue == 0x0312)
@@ -590,10 +589,15 @@ uint8_t* USBD_Dev_DS4_GetDeviceDescriptor( uint8_t speed , uint16_t *length)
 {
 	uint16_t* ptr;
 
-	ptr = &USBD_Dev_DS4_DeviceDescriptor_Cache[8];
-	*ptr = ffsys.nvm_file->d.fmt.ds4_vid;
-	ptr = &USBD_Dev_DS4_DeviceDescriptor_Cache[10];
-	*ptr = ffsys.nvm_file->d.fmt.ds4_pid;
+	if (USBD_Dev_DS4_DeviceDescriptor_Cache == 0) {
+		USBD_Dev_DS4_DeviceDescriptor_Cache = malloc(USBD_Dev_DS4_DeviceDescriptor_SIZE);
+	}
+	memcpy(USBD_Dev_DS4_DeviceDescriptor_Cache, USBD_Dev_DS4_DeviceDescriptor, USBD_Dev_DS4_DeviceDescriptor_SIZE);
+
+	USBD_Dev_DS4_DeviceDescriptor_Cache[8] = (ffsys.nvm_file->d.fmt.ds4_vid & 0xFF) >> 0;
+	USBD_Dev_DS4_DeviceDescriptor_Cache[9] = (ffsys.nvm_file->d.fmt.ds4_vid & 0xFF00) >> 8;
+	USBD_Dev_DS4_DeviceDescriptor_Cache[10] = (ffsys.nvm_file->d.fmt.ds4_pid & 0xFF) >> 0;
+	USBD_Dev_DS4_DeviceDescriptor_Cache[11] = (ffsys.nvm_file->d.fmt.ds4_pid & 0xFF00) >> 8;
 
 	*length = USBD_Dev_DS4_DeviceDescriptor_SIZE;
 	return USBD_Dev_DS4_DeviceDescriptor_Cache;
@@ -659,7 +663,11 @@ void USBD_Dev_DS4_DeviceReset(uint8_t speed) { }
 void USBD_Dev_DS4_DeviceConfigured(void) { }
 void USBD_Dev_DS4_DeviceSuspended(void) { }
 void USBD_Dev_DS4_DeviceResumed(void) { }
-void USBD_Dev_DS4_DeviceConnected(void) { }
+
+void USBD_Dev_DS4_DeviceConnected(void) {
+	dbg_printf(DBGMODE_TRACE, "USBD DS4 Device Connected\r\n");
+}
+
 void USBD_Dev_DS4_DeviceDisconnected(void) { }
 
 USBD_Device_cb_TypeDef USBD_Dev_DS4_cb =

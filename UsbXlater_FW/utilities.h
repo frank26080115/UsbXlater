@@ -61,6 +61,7 @@ char* version_string();
 uint32_t version_crc();
 uint8_t* print_bdaddr(uint8_t*);
 uint8_t* print_linkkey(uint8_t*);
+char is_array_valid(uint8_t* data, uint16_t len);
 int freeRam();
 int current_stack_depth();
 

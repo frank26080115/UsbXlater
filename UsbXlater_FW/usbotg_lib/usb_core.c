@@ -2200,9 +2200,7 @@ void OTG_HS_WKUP_IRQHandler(void)
 
 void OTG_FS_IRQHandler(void)
 {
-  led_1_on();
   USBH_OTG_ISR_Handler(&USB_OTG_Core_host);
-  led_1_off();
 }
 
 /**

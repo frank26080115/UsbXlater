@@ -244,11 +244,10 @@ l2cap_channel_t * l2cap_get_channel_for_local_cid(uint16_t local_cid){
 int  l2cap_can_send_packet_now(uint16_t local_cid){
     l2cap_channel_t *channel = l2cap_get_channel_for_local_cid(local_cid);
     if (!channel) {
-        dbg_printf(DBGMODE_DEBUG, "l2cap_can_send_packet_now no such channel for CID 0x%04X\r\n", local_cid);
+        log_error("l2cap_can_send_packet_now no such channel for CID 0x%04X\r\n", local_cid);
         return 0;
     }
     if (!channel->packets_granted) {
-        dbg_printf(DBGMODE_DEBUG, "l2cap_can_send_packet_now no packets granted for CID 0x%04X\r\n", local_cid);
         return 0;
     }
     return hci_can_send_packet_now(HCI_ACL_DATA_PACKET);
@@ -675,7 +674,7 @@ void l2cap_create_channel_internal(void * connection, btstack_packet_handler_t p
     if (mtu > l2cap_max_mtu()) {
         mtu = l2cap_max_mtu();
     }
-        
+
     // fill in 
     BD_ADDR_COPY(chan->address, address);
     chan->psm = psm;
@@ -685,7 +684,7 @@ void l2cap_create_channel_internal(void * connection, btstack_packet_handler_t p
     chan->remote_mtu = L2CAP_MINIMAL_MTU;
     chan->local_mtu = mtu;
     chan->packets_granted = 0;
-    
+
     // set initial state
     chan->state = L2CAP_STATE_WILL_SEND_CREATE_CONNECTION;
     chan->state_var = L2CAP_CHANNEL_STATE_VAR_NONE;
@@ -695,7 +694,7 @@ void l2cap_create_channel_internal(void * connection, btstack_packet_handler_t p
 
     // add to connections list
     linked_list_add(&l2cap_channels, (linked_item_t *) chan);
-    
+
     // check if hci connection is already usable
     hci_connection_t * conn = hci_connection_for_bd_addr((bd_addr_t*)address);
     if (conn){

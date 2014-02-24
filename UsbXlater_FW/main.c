@@ -4,6 +4,7 @@
 #include "utilities.h"
 #include "crc.h"
 #include "flashfile.h"
+#include "ds4_emu.h"
 #include "btstack/btproxy.h"
 #include "btstack/hci_cereal.h"
 #include <kbm2c/kbm2ctrl.h>
@@ -65,22 +66,15 @@ int main(void)
 	swo_printf("\r\n\r\n%s\r\n", version_string());
 	swo_printf("version CRC 0x%08X\r\n", version_crc());
 	swo_printf("MCU-ID %08X\r\n", DBGMCU->IDCODE);
-	swo_printf("Free RAM: %d\r\n", freeRam());
+	uint32_t* uid;
+	uid = (uint32_t*)(0x1FFF7A10);
+	swo_printf("Unique-ID %08X%08X%08X\r\n", uid[0], uid[1], uid[2]);
 
 	volatile int obj = 123;
 	stack_at_main = (size_t)&obj;
 
-	/*
-	// TODO, this is a simplified loop without fancy functionality, remove when testing is done
-	btproxy_init_RN42HCI();
-	while (1)
-	{
-		btproxy_task();
-	}
-	//*/
-
 	flashfile_init();
-	flashfile_sectorDump();
+	//flashfile_sectorDump();
 
 	led_1_on(); delay_ms(150); led_1_off();
 	led_2_on(); delay_ms(150); led_2_off();
@@ -89,7 +83,9 @@ int main(void)
 
 	memset(&USB_OTG_ISR_Statistics, 0, sizeof(USB_OTG_ISR_Statistics_t));
 
-	//kbm2c_init();
+	kbm2c_init();
+	ds4emu_init();
+	ds4emu_loadState();
 
 	USBD_ExPullUp_Idle();
 
@@ -107,18 +103,12 @@ int main(void)
 	USBH_Dev.Parent = 0;
 	USBH_InitDev(&USB_OTG_Core_host, &USBH_Dev, &USBH_Dev_CB_Default);
 
-	USBD_Init(&USB_OTG_Core_dev, USB_OTG_HS_CORE_ID, &USBD_Dev_DS4_cb);
-	DCD_DevDisconnect(&USB_OTG_Core_dev);
-
 	USB_OTG_BSP_EnableInterrupt(0);
-
-	delay_1ms_cnt = 200;
-	while (delay_1ms_cnt > 100) dbgwdg_feed(); // force disconnection and reconnection
-	DCD_DevConnect(&USB_OTG_Core_dev);
-	while (delay_1ms_cnt > 0) dbgwdg_feed();
 
 	USBH_Dev_HID_Cnt = 0;
 	USBD_CDC_IsReady = 0;
+
+	swo_printf("Free RAM: %d\r\n", freeRam());
 
 	// TODO, this is a simplified loop without fancy functionality, remove when testing is done
 	while (1)
@@ -126,6 +116,8 @@ int main(void)
 		dbgwdg_feed();
 
 		USBH_Process(&USB_OTG_Core_host, &USBH_Dev);
+
+		ds4emu_task();
 	}
 
 	return 0;
@@ -138,6 +130,11 @@ void SysTick_Handler(void)
 	}
 
 	systick_1ms_cnt++;
+
+	if ((systick_1ms_cnt % 2000) == 0)
+	{
+		dbg_printf(DBGMODE_DEBUG, "%d FreeRAM %d\r\n", systick_1ms_cnt, freeRam());
+	}
 
 	//if ((systick_1ms_cnt % 2000) == 0 && dbg_obj != 0) dbg_printf(DBGMODE_DEBUG, "sth %d %d\r\n", systick_1ms_cnt, ((USBH_DevIO_t*)dbg_obj)->state);
 	//if (hal_tick_handler != 0) hal_tick_handler();

@@ -650,7 +650,6 @@ static void sdp_packet_handler(uint8_t packet_type, uint16_t channel, uint8_t *p
                     if (channel == l2cap_cid){
                         // reset
                         l2cap_cid = 0;
-                        dbg_printf(DBGMODE_DEBUG, "l2cap_cid reset, freeRam %d\r\n", freeRam());
                     }
                     break;
 

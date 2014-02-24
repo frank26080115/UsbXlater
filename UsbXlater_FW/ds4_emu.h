@@ -25,6 +25,7 @@ typedef enum {
 	EMUSTATE_HAS_REPORT_02 = 0x100,
 	EMUSTATE_GIVEN_DS4_1401 = 0x200,
 	EMUSTATE_GIVEN_DS4_1402 = 0x400,
+	EMUSTATE_PENDING_PS4_BT_CONN = 0x800,
 }
 EMU_State_t;
 
@@ -48,6 +49,21 @@ typedef enum
 }
 USBD_Host_t;
 
+typedef struct
+{
+	int ds2bt_hidintr_cnt;
+	int ps2bt_hidintr_cnt;
+	int ds2bt_hidctrl_cnt;
+	int ps2bt_hidctrl_cnt;
+	int bt2ds_hidintr_cnt;
+	int bt2ps_hidintr_cnt;
+	int bt2ds_hidctrl_cnt;
+	int bt2ps_hidctrl_cnt;
+	int alloc_mem;
+}
+Proxy_Statistics_t;
+
+extern volatile Proxy_Statistics_t proxy_stats;
 extern const uint8_t ps4_sdp_service_search_attribute_response[];
 extern const uint8_t ds4_extended_inquiry_response[];
 extern const uint8_t ds4_sdp_service_search_attribute_response[];
@@ -61,9 +77,16 @@ extern const uint8_t ds4_bt_device_name[];
 extern volatile EMU_State_t DS4EMU_State;
 extern volatile USBD_Host_t EMU_USBD_Host;
 extern uint8_t ds4_bdaddr[BD_ADDR_LEN];
-extern uint8_t ps4_bdaddr[BD_ADDR_LEN];
+extern volatile uint8_t ps4_bdaddr[BD_ADDR_LEN];
 extern uint8_t ds4_reportA3[DS4_REPORT_A3_LEN];
 extern uint8_t ds4_report02[DS4_REPORT_02_LEN];
-extern uint8_t ps4_link_key[LINK_KEY_LEN];
+extern volatile uint8_t ps4_link_key[LINK_KEY_LEN];
+
+void ds4emu_init();
+void ds4emu_task();
+void ds4emu_loadState();
+int8_t ds4emu_isPs4ConnValid();
+void ds4emu_report(uint8_t* data, uint16_t len);
+void ds4emu_sub_handler(uint8_t packet_type, uint16_t channel, uint8_t *packet, uint16_t size);
 
 #endif

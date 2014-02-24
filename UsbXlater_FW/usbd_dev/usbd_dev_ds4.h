@@ -15,6 +15,10 @@
 #define USBD_Dev_DS4_D2H_EP_SZ 64
 #define USBD_Dev_DS4_H2D_EP_SZ 64
 
+#define USBD_DEV_DS4_Feature_A3_SIZE 49
+#define USBD_DEV_DS4_Feature_02_SIZE 37
+#define USBD_DEV_DS4_Feature_12_SIZE 16
+
 uint8_t USBD_Dev_DS4_SendReport (USB_OTG_CORE_HANDLE *pcore,
                                 uint8_t *report,
                                 uint16_t len);
@@ -45,5 +49,6 @@ void USBD_Dev_DS4_DeviceConnected(void);
 void USBD_Dev_DS4_DeviceDisconnected(void);
 
 extern USBD_Device_cb_TypeDef USBD_Dev_DS4_cb;
+extern char USBD_Dev_DS4_NeedsWriteFlash;
 
 #endif
