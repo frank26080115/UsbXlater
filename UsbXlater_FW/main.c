@@ -133,7 +133,16 @@ void SysTick_Handler(void)
 
 	if ((systick_1ms_cnt % 2000) == 0)
 	{
-		dbg_printf(DBGMODE_DEBUG, "%d FreeRAM %d\r\n", systick_1ms_cnt, freeRam());
+		dbg_printf(DBGMODE_DEBUG, "%d %d , ", systick_1ms_cnt, freeRam());
+		dbg_printf(DBGMODE_DEBUG, "%d %d , ", proxy_stats.ds2bt_hidctrl_cnt, proxy_stats.bt2ps_hidctrl_cnt);
+		dbg_printf(DBGMODE_DEBUG, "%d %d , ", proxy_stats.ds2bt_hidctrl_len, proxy_stats.bt2ps_hidctrl_len);
+		dbg_printf(DBGMODE_DEBUG, "%d %d %d , ", proxy_stats.ds2bt_hidintr_cnt, proxy_stats.ds2bt_hidintr_highprior_cnt, proxy_stats.bt2ps_hidintr_cnt);
+		dbg_printf(DBGMODE_DEBUG, "%d %d %d , ", proxy_stats.ds2bt_hidintr_len, proxy_stats.ds2bt_hidintr_highprior_len, proxy_stats.bt2ps_hidintr_len);
+		dbg_printf(DBGMODE_DEBUG, "%d %d , ", proxy_stats.ps2bt_hidctrl_cnt, proxy_stats.bt2ds_hidctrl_cnt);
+		dbg_printf(DBGMODE_DEBUG, "%d %d , ", proxy_stats.ps2bt_hidctrl_len, proxy_stats.bt2ds_hidctrl_len);
+		dbg_printf(DBGMODE_DEBUG, "%d %d , ", proxy_stats.ps2bt_hidintr_cnt, proxy_stats.bt2ds_hidintr_cnt);
+		dbg_printf(DBGMODE_DEBUG, "%d %d , ", proxy_stats.ps2bt_hidintr_len, proxy_stats.bt2ds_hidintr_len);
+		dbg_printf(DBGMODE_DEBUG, "\r\n");
 	}
 
 	//if ((systick_1ms_cnt % 2000) == 0 && dbg_obj != 0) dbg_printf(DBGMODE_DEBUG, "sth %d %d\r\n", systick_1ms_cnt, ((USBH_DevIO_t*)dbg_obj)->state);

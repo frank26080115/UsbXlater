@@ -40,7 +40,6 @@ uint8_t ds4_outBuffer[512];
 uint16_t ds4_outBufferLen;
 int8_t kbm2c_leftGainIdx = 0;
 int8_t kbm2c_rightGainIdx = 0;
-uint8_t ds4_packet_template[];
 uint8_t ds4_rpt_cnt;
 
 // special testing utilities
@@ -253,15 +252,15 @@ void kbm2c_task(char force)
 		led_3_off();
 	}
 
-	ctrler_data.right_x = kbm2c_mouseData.x;
-	ctrler_data.right_y = kbm2c_mouseData.y;
+	ctrler_data.right_x = kbm2c_mouseData.x * 2;
+	ctrler_data.right_y = kbm2c_mouseData.y * 2;
 
 	if ((kbm2c_mouseData.btn & (1 << 0)) != 0) {
-		ctrler_data.btnBits |= (1 << CTRLBTN_BUMPER_RIGHT);
+		ctrler_data.btnBits |= (1 << CTRLBTN_TRIGGER_RIGHT);
 	}
 
 	if ((kbm2c_mouseData.btn & (1 << 1)) != 0) {
-		ctrler_data.btnBits |= (1 << CTRLBTN_BUMPER_LEFT);
+		ctrler_data.btnBits |= (1 << CTRLBTN_TRIGGER_LEFT);
 	}
 
 	if ((kbm2c_mouseData.btn & (1 << 2)) != 0) {
@@ -296,11 +295,11 @@ void kbm2c_task(char force)
 	}
 
 	if (KBM2C_CHECKKEY(KEYCODE_G, kbm2c_keyFlags)) {
-		ctrler_data.btnBits |= (1 << CTRLBTN_TRIGGER_LEFT);
+		ctrler_data.btnBits |= (1 << CTRLBTN_BUMPER_LEFT);
 	}
 
 	if (KBM2C_CHECKKEY(KEYCODE_F, kbm2c_keyFlags)) {
-		ctrler_data.btnBits |= (1 << CTRLBTN_TRIGGER_RIGHT);
+		ctrler_data.btnBits |= (1 << CTRLBTN_BUMPER_RIGHT);
 	}
 
 	if (KBM2C_CHECKKEY(KEYCODE_SPACE, kbm2c_keyFlags)) {
@@ -335,7 +334,8 @@ void kbm2c_task(char force)
 		ctrler_data.btnBits |= (1 << CTRLBTN_HOME);
 	}
 
-	// TODO: send the report here
+	kbm2c_prepForPS4();
+	ds4emu_report(ds4_outBuffer, ds4_outBufferLen);
 
 	memcpy(kbm2c_keyFlagsPrev, kbm2c_keyFlags, KBM2C_KEYFLAGS_SIZE * sizeof(uint32_t));
 }
@@ -434,7 +434,6 @@ void kbm2c_prepForDS3()
 	dsFillerX = (USBH_DS4_Available != 0) ? (USBH_DS_Buffer[3]) : ((USBH_DS3_Available != 0) ? USBH_DS_Buffer[5] : 0);
 	dsFillerY = (USBH_DS4_Available != 0) ? (USBH_DS_Buffer[4]) : ((USBH_DS3_Available != 0) ? USBH_DS_Buffer[6] : 0);
 	kbm2c_inactiveStickCalc(&(ctrler_data.right_x), &(ctrler_data.right_y), &(kbm2c_randomDeadZone[2]), kbm2c_config.right_stick_deadzone, dsFillerX, dsFillerY);
-
 
 	temp = lround(ctrler_data.left_x);
 	temp += 127;

@@ -15,7 +15,7 @@ typedef struct {
 	int8_t mouse_wheelx_size;
 	int8_t mouse_but_bitidx;
 	int8_t kb_exists; // must be > 0 to be true
-	int8_t kb_ep;
+	uint8_t kb_ep;
 	int8_t kb_report_id; // negative if not used, or else it must match
 	int8_t kb_modifier_idx;
 	int8_t kb_keycode_idx;
@@ -23,11 +23,11 @@ typedef struct {
 
 	// TODO: maybe add support for consumer and sysctrl keys
 	int8_t consumer_exists; // must be > 0 to be true
-	int8_t consumer_ep;
+	uint8_t consumer_ep;
 	int8_t consumer_report_id;
 	int8_t consumer_code_idx;
 	int8_t sysctrl_exists; // must be > 0 to be true
-	int8_t sysctrl_ep;
+	uint8_t sysctrl_ep;
 	int8_t sysctrl_report_id;
 	int8_t sysctrl_code_idx;
 }

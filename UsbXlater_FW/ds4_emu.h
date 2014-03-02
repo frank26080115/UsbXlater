@@ -52,6 +52,7 @@ USBD_Host_t;
 typedef struct
 {
 	int ds2bt_hidintr_cnt;
+	int ds2bt_hidintr_highprior_cnt;
 	int ps2bt_hidintr_cnt;
 	int ds2bt_hidctrl_cnt;
 	int ps2bt_hidctrl_cnt;
@@ -59,6 +60,15 @@ typedef struct
 	int bt2ps_hidintr_cnt;
 	int bt2ds_hidctrl_cnt;
 	int bt2ps_hidctrl_cnt;
+	int ds2bt_hidintr_len;
+	int ds2bt_hidintr_highprior_len;
+	int ps2bt_hidintr_len;
+	int ds2bt_hidctrl_len;
+	int ps2bt_hidctrl_len;
+	int bt2ds_hidintr_len;
+	int bt2ps_hidintr_len;
+	int bt2ds_hidctrl_len;
+	int bt2ps_hidctrl_len;
 	int alloc_mem;
 }
 Proxy_Statistics_t;

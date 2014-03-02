@@ -126,8 +126,8 @@ static inline void ringbuffer_flush(ringbuffer_t* const buffer)
 
 typedef struct
 {
-	uint16_t length;
-	void*    data;
+	volatile int length;
+	volatile void*    data;
 } ptr_item_t;
 
 typedef struct
@@ -137,14 +137,14 @@ typedef struct
 	volatile ptr_item_t*	start;	// pointer to the start of the buffer's underlying storage array
 	volatile ptr_item_t*	end;	// pointer to the end of the buffer's underlying storage array
 	volatile uint8_t		queueSize;	// max num of items in queue
-	volatile uint16_t		dataSize;	// max size of item
+	volatile int			dataSize;	// max size of item
 	volatile uint8_t		count;	// number of bytes currently stored in the buffer
 	volatile uint8_t		flag;
 	volatile uint8_t		ready;  // must be 0xAB
 } ptr_ringbuffer_t;
 
-static inline void ptr_ringbuffer_init(ptr_ringbuffer_t* buffer, const uint8_t queueSize, const uint16_t dataSize);
-static inline void ptr_ringbuffer_init(ptr_ringbuffer_t* buffer, const uint8_t queueSize, const uint16_t dataSize)
+static inline void ptr_ringbuffer_init(ptr_ringbuffer_t* buffer, uint8_t queueSize, int dataSize);
+static inline void ptr_ringbuffer_init(ptr_ringbuffer_t* buffer, uint8_t queueSize, int dataSize)
 {
 	ptr_item_t*      dataptr = calloc(queueSize, sizeof(ptr_item_t));
 	buffer->in     = dataptr;
@@ -156,19 +156,19 @@ static inline void ptr_ringbuffer_init(ptr_ringbuffer_t* buffer, const uint8_t q
 	buffer->count  = 0;
 	buffer->flag   = 0;
 	for (int i = 0; i < queueSize; i++) {
-		dataptr[0].data = malloc(dataSize);
+		dataptr[i].data = malloc(dataSize);
 	}
 	buffer->ready  = 0xAB;
 }
 
-static inline void ptr_ringbuffer_push(ptr_ringbuffer_t* buffer, const void* data, uint16_t size);
-static inline void ptr_ringbuffer_push(ptr_ringbuffer_t* buffer, const void* data, uint16_t size)
+static inline void ptr_ringbuffer_push(ptr_ringbuffer_t* buffer, void* data, int size);
+static inline void ptr_ringbuffer_push(ptr_ringbuffer_t* buffer, void* data, int size)
 {
 	if (size <= 0) {
 		return;
 	}
 
-	ptr_item_t* n = buffer->in;
+	volatile ptr_item_t* n = buffer->in;
 	if (size > buffer->dataSize) size = buffer->dataSize;
 	n->length = size;
 	memcpy(n->data, data, size);
@@ -192,8 +192,8 @@ static inline uint16_t ptr_ringbuffer_pop(ptr_ringbuffer_t* buffer, void* dest)
 		return 0;
 	}
 
-	ptr_item_t* n = buffer->out;
-	uint16_t length = n->length;
+	volatile ptr_item_t* n = buffer->out;
+	int length = n->length;
 	if (dest != 0) {
 		memcpy(dest, n->data, length);
 	}

@@ -38,9 +38,12 @@ EMU_USBD_Mode_t EMU_USBD_Mode_Wanted;
 char USBD_Needs_Switch;
 uint32_t USBD_Switch_Timer;
 uint32_t USBD_PS_Check_Timer;
+uint32_t last_hidpkt_timestamp;
 
 ptr_ringbuffer_t ds2ps_hidintr_queue;
+ptr_ringbuffer_t ds2ps_hidintr_highprior_queue;
 ptr_ringbuffer_t ps2ds_hidintr_queue;
+//ptr_ringbuffer_t ps2ds_hidintr_highprior_queue;
 ptr_ringbuffer_t ds2ps_hidctrl_queue;
 ptr_ringbuffer_t ps2ds_hidctrl_queue;
 
@@ -67,10 +70,12 @@ void ds4emu_init()
 	bt_extended_inquiry_response = ds4_extended_inquiry_response;
 
 	proxy_stats.alloc_mem = freeRam();
-	ptr_ringbuffer_init(&ds2ps_hidintr_queue, 8, 512 + 64);
-	ptr_ringbuffer_init(&ps2ds_hidintr_queue, 8, 512 + 64);
-	ptr_ringbuffer_init(&ds2ps_hidctrl_queue, 4, 128);
-	ptr_ringbuffer_init(&ps2ds_hidctrl_queue, 4, 128);
+	ptr_ringbuffer_init(&ds2ps_hidintr_queue, 8, 576);
+	ptr_ringbuffer_init(&ds2ps_hidintr_highprior_queue, 8, 576);
+	ptr_ringbuffer_init(&ps2ds_hidintr_queue, 8, 576);
+	//ptr_ringbuffer_init(&ps2ds_hidintr_highprior_queue, 4, 512 + 64);
+	ptr_ringbuffer_init(&ds2ps_hidctrl_queue, 8, 128);
+	ptr_ringbuffer_init(&ps2ds_hidctrl_queue, 8, 128);
 	proxy_stats.alloc_mem -= freeRam();
 }
 
@@ -94,6 +99,7 @@ void ds4emu_task()
 	}
 
 	ds4emu_reroute(&ds2ps_hidintr_queue, bt2ps_hidintr_channel);
+	ds4emu_reroute(&ds2ps_hidintr_highprior_queue, bt2ps_hidintr_channel);
 	ds4emu_reroute(&ds2ps_hidctrl_queue, bt2ps_hidctrl_channel);
 	ds4emu_reroute(&ps2ds_hidintr_queue, bt2ds_hidintr_channel);
 	ds4emu_reroute(&ps2ds_hidctrl_queue, bt2ds_hidctrl_channel);
@@ -475,6 +481,7 @@ char btproxy_sub_handler(void * connection, uint8_t packet_type, uint16_t channe
 				proxy_stats.ps2bt_hidintr_cnt++;
 				if (bt2ds_hidintr_channel != 0) {
 					ptr_ringbuffer_push(&ps2ds_hidintr_queue, packet, size);
+					proxy_stats.ps2bt_hidintr_len += size;
 				}
 				ret = 1;
 			}
@@ -482,28 +489,58 @@ char btproxy_sub_handler(void * connection, uint8_t packet_type, uint16_t channe
 				proxy_stats.ps2bt_hidctrl_cnt++;
 				if (bt2ds_hidctrl_channel != 0) {
 					ptr_ringbuffer_push(&ps2ds_hidctrl_queue, packet, size);
+					proxy_stats.ps2bt_hidctrl_len += size;
 				}
 				ret = 1;
 			}
 			else if (channel == bt2ds_hidintr_channel) {
-				proxy_stats.ds2bt_hidintr_cnt++;
-				if (bt2ps_hidintr_channel != 0) {
-					if (packet[1] >= 0x11 && packet[1] <= 0x13 && USBH_Dev_HID_Cnt > 0) {
+				char isImportant = 1;
+				if ((packet[1] >= 0x11 && packet[1] <= 0x20) || packet[1] == 0x01) {
+					isImportant = 0;
+				}
 
+				if (isImportant != 0)
+				{
+					proxy_stats.ds2bt_hidintr_highprior_cnt++;
+					if (bt2ps_hidintr_channel != 0) {
+						ptr_ringbuffer_push(&ds2ps_hidintr_highprior_queue, packet, size);
+						proxy_stats.ds2bt_hidintr_highprior_len += size;
 					}
-					else {
-						ptr_ringbuffer_push(&ds2ps_hidintr_queue, packet, size);
+				}
+				else
+				{
+					if ((systick_1ms_cnt - last_hidpkt_timestamp) >= 5)
+					{
+						if (USBH_Dev_HID_Cnt > 0)
+						{
+							kbm2c_handleDs4BtReport(packet, size);
+						}
+						else
+						{
+							proxy_stats.ds2bt_hidintr_cnt++;
+							if (bt2ps_hidintr_channel != 0) {
+								ptr_ringbuffer_push(&ds2ps_hidintr_queue, packet, size);
+								proxy_stats.ds2bt_hidintr_len += size;
+							}
+						}
+						last_hidpkt_timestamp = systick_1ms_cnt;
 					}
 				}
 				ret = 1;
 			}
-			else if (channel == bt2ds_hidintr_channel) {
-				proxy_stats.ds2bt_hidintr_cnt++;
+			else if (channel == bt2ds_hidctrl_channel) {
+				proxy_stats.ds2bt_hidctrl_cnt++;
 				if (bt2ps_hidctrl_channel != 0) {
 					ptr_ringbuffer_push(&ds2ps_hidctrl_queue, packet, size);
+					proxy_stats.ds2bt_hidctrl_len += size;
 				}
 				ret = 1;
 			}
+			/*
+			else {
+				dbg_printf(DBGMODE_DEBUG, "ACL from unknown channel 0x%04X\r\n", channel);
+			}
+			*/
 			break;
 	}
 	return ret;
@@ -529,15 +566,19 @@ void ds4emu_reroute(ptr_ringbuffer_t* queue, uint16_t local_cid)
 			{
 				if (local_cid == bt2ps_hidctrl_channel) {
 					proxy_stats.bt2ps_hidctrl_cnt++;
+					proxy_stats.bt2ps_hidctrl_len += length;
 				}
 				else if (local_cid == bt2ds_hidctrl_channel) {
 					proxy_stats.bt2ds_hidctrl_cnt++;
+					proxy_stats.bt2ds_hidctrl_len += length;
 				}
 				else if (local_cid == bt2ps_hidintr_channel) {
 					proxy_stats.bt2ps_hidintr_cnt++;
+					proxy_stats.bt2ps_hidintr_len += length;
 				}
 				else if (local_cid == bt2ds_hidintr_channel) {
 					proxy_stats.bt2ds_hidintr_cnt++;
+					proxy_stats.bt2ds_hidintr_len += length;
 				}
 				l2cap_send_prepared(local_cid, length);
 			}
@@ -549,7 +590,9 @@ void ds4emu_report(uint8_t* data, uint16_t len)
 {
 	if (bt2ps_hidintr_channel != 0) {
 		ds4emu_crc32_calc_append(data, len);
+		proxy_stats.ds2bt_hidintr_cnt++;
 		ptr_ringbuffer_push(&ds2ps_hidintr_queue, data, len);
+		proxy_stats.ds2bt_hidintr_len += len;
 	}
 }
 

@@ -59,7 +59,7 @@ void HID_Default_Data_Handler(void* p_io, uint8_t* data, uint16_t len)
 	}
 	vcp_printf("\r\n");
 
-	dbg_printf(DBGMODE_DEBUG, "%s:C%d:IntIN:\r\n", USBH_Dev_DebugPrint(p_in->pdev, p_in->ep), len);
+	//dbg_printf(DBGMODE_DEBUG, "%s:C%d:IntIN:\r\n", USBH_Dev_DebugPrint(p_in->pdev, p_in->ep), len);
 
 	HID_Rpt_Parsing_Params_t* parser = (HID_Rpt_Parsing_Params_t*)(p_in->extra);
 
